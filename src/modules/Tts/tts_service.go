@@ -40,11 +40,10 @@ func (s *Service) TextToSpeechElevenlabs(text, voice_id string) ([]byte, error) 
 		}).
 		SetDoNotParseResponse(true).
 		Post(url)
-
+	fmt.Printf("ElevenLabs status=%d body=%q\n", resp.StatusCode(), resp.String())
 	if err != nil {
 		return nil, err
 	}
-
 	if resp.StatusCode() != 200 {
 		return nil, fmt.Errorf("error ElevenLabs: %s", resp.String())
 	}

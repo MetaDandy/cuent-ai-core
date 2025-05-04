@@ -13,6 +13,11 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - DB_NAME=${DB_NAME}
+      - GOFLAGS=-buildvcs=false
+    volumes:
+      - .:/app
+      - /go/pkg/mod
+      - /app/tmp
     depends_on:
       - db
 

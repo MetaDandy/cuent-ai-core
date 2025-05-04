@@ -5,15 +5,18 @@ import (
 	"strings"
 
 	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 
 type Service struct {
-	tts *tts.Service
+	tts     *tts.Service
+	storage *supabase.Service
 }
 
-func NewService(tts *tts.Service) *Service {
+func NewService(tts *tts.Service, storage *supabase.Service) *Service {
 	return &Service{
-		tts: tts,
+		tts:     tts,
+		storage: storage,
 	}
 }
 
@@ -81,7 +84,6 @@ func (s *Service) audioOutput(
 	for idx, raw := range lines {
 		line := strings.TrimSpace(raw)
 		if strings.HasPrefix(line, "*") {
-			// Esto es un SFX: quitamos el '*' y el posible espacio
 			prompt := strings.TrimSpace(strings.TrimPrefix(line, "*"))
 			audio, err := s.tts.TextToSoundEffects(
 				prompt,

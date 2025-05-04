@@ -3,6 +3,7 @@ package src
 import (
 	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/cuentai"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 
 type Container struct {
@@ -13,6 +14,10 @@ type Container struct {
 	// CuentAI
 	CuentSvc     *cuentai.Service
 	CuentHandler *cuentai.Handler
+
+	// Supabase
+	SupaSvc     *supabase.Service
+	SupaHandler *supabase.Handler
 }
 
 func SetupContainer() *Container {
@@ -20,8 +25,12 @@ func SetupContainer() *Container {
 	ttsSvc := tts.NewService()
 	ttsHandler := tts.NewHandler(ttsSvc)
 
+	// Supabase
+	supaSvc := supabase.NewService()
+	supaHandler := supabase.NewHandler(supaSvc)
+
 	// CuentAI
-	cuentSvc := cuentai.NewService(ttsSvc)
+	cuentSvc := cuentai.NewService(ttsSvc, supaSvc)
 	cuentHandler := cuentai.NewHandler(cuentSvc)
 
 	return &Container{
@@ -32,5 +41,9 @@ func SetupContainer() *Container {
 		// CuentAI
 		CuentSvc:     cuentSvc,
 		CuentHandler: cuentHandler,
+
+		// Supabase
+		SupaSvc:     supaSvc,
+		SupaHandler: supaHandler,
 	}
 }
