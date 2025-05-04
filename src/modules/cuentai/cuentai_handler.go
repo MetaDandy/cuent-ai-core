@@ -1,8 +1,6 @@
 package cuentai
 
 import (
-	"encoding/base64"
-
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -32,21 +30,5 @@ func (h *Handler) CuentAIFlow(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 
-	// preparamos el JSON de respuesta con Base64
-	type flowResp struct {
-		Lines    []string `json:"lines"`
-		TTSClips []string `json:"tts_clips"`
-		SFXClips []string `json:"sfx_clips"`
-		Combined string   `json:"combined"`
-	}
-	out := flowResp{Lines: res.Lines}
-	for _, clip := range res.TTSClips {
-		out.TTSClips = append(out.TTSClips, base64.StdEncoding.EncodeToString(clip))
-	}
-	for _, clip := range res.SFXClips {
-		out.SFXClips = append(out.SFXClips, base64.StdEncoding.EncodeToString(clip))
-	}
-	out.Combined = base64.StdEncoding.EncodeToString(res.Combined)
-
-	return c.JSON(out)
+	return c.JSON(res)
 }

@@ -2,7 +2,7 @@ FROM golang:1.24.1-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache git gcc musl-dev
+RUN apk add --no-cache git gcc musl-dev ffmpeg
 RUN go install github.com/air-verse/air@latest
 
 COPY go.mod go.sum ./
