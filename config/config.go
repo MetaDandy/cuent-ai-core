@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/MetaDandy/cuent-ai-core/config/seed"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -40,6 +41,8 @@ func Load() {
 		DB, err = gorm.Open(postgres.Open(dns), &gorm.Config{})
 		if err == nil {
 			log.Printf("Database connected successfully after %d attempt(s)", i+1)
+			Migrate(DB)
+			seed.Seeder(DB)
 			return
 		}
 
