@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/MetaDandy/cuent-ai-core/src/model"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
 )
 
 type ScriptCreate struct {
@@ -28,7 +29,7 @@ type ScriptReponse struct {
 	Mixed_Media       string  `json:"mixed_media"`
 
 	//Poner proyecto
-	//Poner assets
+	Assets []asset.AssetResponse `json:"assets,omitempty"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -42,6 +43,14 @@ func ScriptToDTO(u *model.Script) ScriptReponse {
 		deletedAt = &t
 	}
 
+	var assets []asset.AssetResponse
+	if len(u.Assets) > 0 {
+		assets = make([]asset.AssetResponse, 0, len(u.Assets))
+		for i := range u.Assets {
+			assets = append(assets, asset.AssetToDto(&u.Assets[i]))
+		}
+	}
+
 	return ScriptReponse{
 		ID:                u.ID.String(),
 		Prompt_Tokens:     u.Prompt_Tokens,
@@ -53,6 +62,7 @@ func ScriptToDTO(u *model.Script) ScriptReponse {
 		Total_Cost:        u.Total_Cost,
 		Mixed_Audio:       u.Mixed_Audio,
 		Mixed_Media:       u.Mixed_Media,
+		Assets:            assets,
 
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

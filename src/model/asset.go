@@ -17,6 +17,7 @@ type Asset struct {
 	AudioState State          `gorm:"type:state;default:'PENDING'"`
 	VideoState State          `gorm:"type:state;default:'PENDING'"`
 	Duration   datatypes.Time `gorm:"type:time"`
+	Position   int            `gorm:"not null"`
 
 	ScriptID uuid.UUID
 	Script   Script

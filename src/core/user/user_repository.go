@@ -3,6 +3,7 @@ package user
 import (
 	"errors"
 
+	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"gorm.io/gorm"
 )
@@ -13,6 +14,16 @@ type Repository struct {
 
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.User, int64, error) {
+	var finded []model.User
+	query := r.db.Model(model.User{})
+	var total int64
+	query, total = helper.ApplyFindAllOptions(query, opts)
+
+	err := query.Find(&finded).Error
+	return finded, total, err
 }
 
 func (c *Repository) FindById(id string) (*model.User, error) {

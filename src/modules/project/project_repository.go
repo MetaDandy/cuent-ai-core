@@ -1,8 +1,6 @@
 package project
 
 import (
-	"errors"
-
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"gorm.io/gorm"
@@ -26,7 +24,7 @@ func (r *Repository) Update(project *model.Project) error {
 
 func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int64, error) {
 	var finded []model.Project
-	query := r.db.Model(model.User{})
+	query := r.db.Model(model.Project{})
 	var total int64
 	query, total = helper.ApplyFindAllOptions(query, opts)
 
@@ -37,21 +35,19 @@ func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int6
 func (r *Repository) FindById(id string) (*model.Project, error) {
 	var project model.Project
 	err := r.db.First(&project, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &project, err
+	return &project, nil
 }
 
 func (r *Repository) FindByIdUnscoped(id string) (*model.Project, error) {
 	var project model.Project
 	err := r.db.Unscoped().First(&project, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &project, err
+	return &project, nil
 }
 
 func (r *Repository) SoftDelete(id string) error {

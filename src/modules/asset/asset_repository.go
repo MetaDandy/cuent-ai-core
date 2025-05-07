@@ -1,8 +1,6 @@
 package asset
 
 import (
-	"errors"
-
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"gorm.io/gorm"
@@ -37,21 +35,21 @@ func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Asset, int64,
 func (r *Repository) FindById(id string) (*model.Asset, error) {
 	var asset model.Asset
 	err := r.db.First(&asset, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &asset, err
+
+	return &asset, nil
 }
 
 func (r *Repository) FindByIdUnscoped(id string) (*model.Asset, error) {
 	var asset model.Asset
 	err := r.db.Unscoped().First(&asset, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &asset, err
+
+	return &asset, nil
 }
 
 func (r *Repository) SoftDelete(id string) error {

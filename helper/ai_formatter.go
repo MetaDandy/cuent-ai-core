@@ -10,6 +10,7 @@ type AIFormatterResponse struct {
 	Processed_Text_Array []string
 }
 
+// ! Cuando tengamos la api key de la ia cambiar la función
 func AIFormatter(text_entry string) (*AIFormatterResponse, error) {
 	// Aquí simulas la respuesta de la API tal como en el ejemplo de Python
 	response := `SACERDOTE.- Con oportunidad has hablado

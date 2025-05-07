@@ -26,6 +26,8 @@ type Container struct {
 
 	// User
 	UserRepo *user.Repository
+	UserSvc  *user.Service
+	UserHdl  *user.Handler
 
 	// Project
 	ProjectRepo *project.Repository
@@ -56,6 +58,8 @@ func SetupContainer() *Container {
 
 	// User
 	userRepo := user.NewRepository(config.DB)
+	userSvc := user.NewService(userRepo)
+	userHdl := user.NewHandler(userSvc)
 
 	// Project
 	projectRepo := project.NewRepository(config.DB)
@@ -85,6 +89,8 @@ func SetupContainer() *Container {
 
 		// User
 		UserRepo: userRepo,
+		UserSvc:  userSvc,
+		UserHdl:  userHdl,
 
 		// Project
 		ProjectRepo: projectRepo,

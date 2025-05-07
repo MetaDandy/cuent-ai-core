@@ -5,6 +5,7 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -40,6 +41,7 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 		}
 
 		script = model.Script{
+			ID:                uuid.New(),
 			Text_Entry:        input.TextEntry,
 			ProjectID:         project.ID,
 			Prompt_Tokens:     aiResponse.Prompt_Tokens,
@@ -54,11 +56,13 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 		}
 
 		assets := make([]model.Asset, 0, len(aiResponse.Processed_Text_Array))
-		for _, line := range aiResponse.Processed_Text_Array {
+		for i, line := range aiResponse.Processed_Text_Array {
 			assets = append(assets, model.Asset{
-				Type:     "LINE",
+				ID:       uuid.New(),
+				Type:     "LINE", // ! Hacer que sea un enum entre tts y sfx
 				Line:     line,
 				ScriptID: script.ID,
+				Position: i,
 			})
 		}
 		if err := tx.Create(&assets).Error; err != nil {
@@ -73,7 +77,36 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 	}
 
 	// ! Ver si creamos un findby id que busque con relaciones con assets
-	reload, _ := s.repo.FindById(script.ID.String())
+	reload, _ := s.repo.FindByIdWithAssets(script.ID.String())
 	dto := ScriptToDTO(reload)
+	return &dto, nil
+}
+
+func (s *Service) FindAll(opts *helper.FindAllOptions) (*helper.PaginatedResponse[ScriptReponse], error) {
+	finded, total, err := s.repo.FindAll(opts)
+	if err != nil {
+		return nil, err
+	}
+	dtos := ScriptToListDTO(finded)
+	pages := uint((total + int64(opts.Limit) - 1) / int64(opts.Limit))
+
+	return &helper.PaginatedResponse[ScriptReponse]{
+		Data:   dtos,
+		Total:  total,
+		Limit:  opts.Limit,
+		Offset: opts.Offset,
+		Pages:  pages,
+	}, nil
+}
+
+func (s *Service) FindByID(id string) (*ScriptReponse, error) {
+	finded, err := s.repo.FindByIdWithAssets(id)
+	if err != nil {
+		return nil, err
+	}
+	if finded == nil {
+		return nil, nil
+	}
+	dto := ScriptToDTO(finded)
 	return &dto, nil
 }

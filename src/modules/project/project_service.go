@@ -4,6 +4,7 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -52,6 +53,7 @@ func (s *Service) Create(input *ProjectCreate) (*ProjectResponse, error) {
 	}
 
 	project := model.Project{
+		ID:          uuid.New(),
 		Name:        input.Name,
 		Description: input.Description,
 		State:       model.StatePending,

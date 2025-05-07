@@ -1,8 +1,6 @@
 package script
 
 import (
-	"errors"
-
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"gorm.io/gorm"
@@ -26,7 +24,7 @@ func (r *Repository) Update(script *model.Script) error {
 
 func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Script, int64, error) {
 	var finded []model.Script
-	query := r.db.Model(model.User{})
+	query := r.db.Model(model.Script{})
 	var total int64
 	query, total = helper.ApplyFindAllOptions(query, opts)
 
@@ -37,21 +35,28 @@ func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Script, int64
 func (r *Repository) FindById(id string) (*model.Script, error) {
 	var script model.Script
 	err := r.db.First(&script, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &script, err
+	return &script, nil
+}
+
+func (r *Repository) FindByIdWithAssets(id string) (*model.Script, error) {
+	var script model.Script
+	err := r.db.Preload("Assets").First(&script, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &script, nil
 }
 
 func (r *Repository) FindByIdUnscoped(id string) (*model.Script, error) {
 	var script model.Script
 	err := r.db.Unscoped().First(&script, "id = ?", id).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
+	if err != nil {
+		return nil, err
 	}
-	return &script, err
+	return &script, nil
 }
 
 func (r *Repository) SoftDelete(id string) error {
