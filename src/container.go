@@ -4,8 +4,10 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/config"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/cuentai"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/script"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 
@@ -29,6 +31,14 @@ type Container struct {
 	ProjectRepo *project.Repository
 	ProjectSvc  *project.Service
 	ProjectHdl  *project.Handler
+
+	// Script
+	ScriptRepo *script.Repository
+	ScriptSvc  *script.Service
+	ScriptHdl  *script.Handler
+
+	// Asset
+	AssetRepo *asset.Repository
 }
 
 func SetupContainer() *Container {
@@ -52,6 +62,14 @@ func SetupContainer() *Container {
 	projectSvc := project.NewService(projectRepo, userRepo)
 	projectHdl := project.NewHandler(projectSvc)
 
+	// Asset
+	assetRepo := asset.NewRepository(config.DB)
+
+	// Script
+	scriptRepo := script.NewRepository(config.DB)
+	scriptSvc := script.NewService(scriptRepo, projectRepo, assetRepo)
+	scriptHdl := script.NewHandler(scriptSvc)
+
 	return &Container{
 		// TTS
 		TtsSvc:     ttsSvc,
@@ -72,5 +90,13 @@ func SetupContainer() *Container {
 		ProjectRepo: projectRepo,
 		ProjectSvc:  projectSvc,
 		ProjectHdl:  projectHdl,
+
+		// Asset
+		AssetRepo: assetRepo,
+
+		//Script
+		ScriptRepo: scriptRepo,
+		ScriptSvc:  scriptSvc,
+		ScriptHdl:  scriptHdl,
 	}
 }

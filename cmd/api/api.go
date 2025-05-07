@@ -9,13 +9,14 @@ func SetupApi(app *fiber.App, c *src.Container) {
 	v1 := app.Group("/api/v1")
 
 	app.Get("/", func(ctx *fiber.Ctx) error {
-		return ctx.SendString("Hello, World!")
+		return ctx.SendString("Aloha")
 	})
 
 	handlers := []func(fiber.Router){
 		c.TtsHandler.RegisterTTSRoutes,
 		c.CuentHandler.RegisterRoutes,
 		c.SupaHandler.RegisterRoutes,
+		c.ProjectHdl.RegisterRoutes,
 	}
 
 	for _, register := range handlers {

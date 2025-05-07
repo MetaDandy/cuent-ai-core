@@ -8,6 +8,7 @@ import (
 
 type ScriptCreate struct {
 	TextEntry string `json:"text_entry" validate:"required"`
+	ProjectID string `json:"project_id" validate:"required"`
 }
 
 type ScriptUpdate struct {
@@ -16,9 +17,9 @@ type ScriptUpdate struct {
 
 type ScriptReponse struct {
 	ID                string  `json:"id"`
-	Prompt_Tokens     string  `json:"promt_tokens"`
-	Completion_Tokens string  `json:"completion_tokens"`
-	Total_Tokens      string  `json:"total_tokens"`
+	Prompt_Tokens     uint32  `json:"promt_tokens"`
+	Completion_Tokens uint32  `json:"completion_tokens"`
+	Total_Tokens      uint32  `json:"total_tokens"`
 	State             string  `json:"state"`
 	Text_Entry        string  `json:"text_entry"`
 	Processed_Text    string  `json:"processed_text"`

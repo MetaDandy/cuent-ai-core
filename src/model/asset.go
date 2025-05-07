@@ -10,7 +10,7 @@ import (
 
 type Asset struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey;"`
-	Type       string
+	Type       string    // ? Ver si poner un enum de sfx o tts
 	Video_URL  string
 	Audio_URL  string
 	Line       string
