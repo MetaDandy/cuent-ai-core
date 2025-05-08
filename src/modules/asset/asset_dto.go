@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/MetaDandy/cuent-ai-core/src/model"
+	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 )
 
 type AssetResponse struct {
@@ -14,8 +15,10 @@ type AssetResponse struct {
 	Line       string `json:"line"`
 	AudioState string `json:"audio_state"`
 	VideoState string `json:"video_state"`
-	Duration   string `json:"duration"` // ? ver si dejarlo en datatype time
+	Duration   uint   `json:"duration"`
 	Position   int    `json:"position"`
+
+	Generated []generatejob.GeneratedJobResponse `json:"meta_data,omitempty"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -29,6 +32,12 @@ func AssetToDto(u *model.Asset) AssetResponse {
 		deletedAt = &t
 	}
 
+	var generated []generatejob.GeneratedJobResponse
+	if len(u.GeneratedJobs) > 0 {
+		generated = make([]generatejob.GeneratedJobResponse, 0, len(u.GeneratedJobs))
+		generated = generatejob.GeneratedJobToLisDTO(u.GeneratedJobs)
+	}
+
 	return AssetResponse{
 		ID:         u.ID.String(),
 		Type:       u.Type,
@@ -37,8 +46,10 @@ func AssetToDto(u *model.Asset) AssetResponse {
 		Line:       u.Line,
 		AudioState: string(u.AudioState),
 		VideoState: string(u.VideoState),
-		Duration:   u.Duration.String(),
+		Duration:   u.Duration,
 		Position:   u.Position,
+
+		Generated: generated,
 
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

@@ -6,6 +6,7 @@ import (
 	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/cuentai"
+	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/script"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
@@ -41,6 +42,11 @@ type Container struct {
 
 	// Asset
 	AssetRepo *asset.Repository
+	AssetSvc  *asset.Service
+	AssetHdl  *asset.Handler
+
+	// Generated Job
+	GeneratedJobRepo *generatejob.Repository
 }
 
 func SetupContainer() *Container {
@@ -66,8 +72,13 @@ func SetupContainer() *Container {
 	projectSvc := project.NewService(projectRepo, userRepo)
 	projectHdl := project.NewHandler(projectSvc)
 
+	// Generated Job
+	generatedJobRepo := generatejob.NewRepository(config.DB)
+
 	// Asset
 	assetRepo := asset.NewRepository(config.DB)
+	assetSvc := asset.NewService(assetRepo, generatedJobRepo)
+	assetHdl := asset.NewHandler(assetSvc)
 
 	// Script
 	scriptRepo := script.NewRepository(config.DB)
@@ -99,10 +110,15 @@ func SetupContainer() *Container {
 
 		// Asset
 		AssetRepo: assetRepo,
+		AssetSvc:  assetSvc,
+		AssetHdl:  assetHdl,
 
 		//Script
 		ScriptRepo: scriptRepo,
 		ScriptSvc:  scriptSvc,
 		ScriptHdl:  scriptHdl,
+
+		//Generated Job
+		GeneratedJobRepo: generatedJobRepo,
 	}
 }

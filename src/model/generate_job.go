@@ -13,10 +13,8 @@ type GeneratedJob struct {
 	Provider      Provider  `gorm:"type:provider;default:'ELEVENLAB'"`
 	Model         string
 	Token_Spent   string
-	Input_Chats   string
+	Chars_Used    uint
 	State         State `gorm:"type:state;default:'PENDING'"`
-	Finished_At   time.Time
-	Stared_At     time.Time
 	Error_Message string
 	Cost          float64
 

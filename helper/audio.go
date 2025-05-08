@@ -3,33 +3,31 @@ package helper
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hajimehoshi/go-mp3"
 )
 
-// const (
-//
-//	bucket  string = "audio"
-//	dirPath string = "user/path"
-//
-// )
-
 // ? Ver si enviar el context como parametro
-func AudioOutput(line, id, bucket, dirPath string) (url string, err error) {
+func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string, duration time.Duration, err error) {
 	var (
 		audio    []byte
 		fileName string
 	)
 
+	duration = 3 * time.Second
+
 	if strings.HasPrefix(line, "*") {
 		prompt := strings.TrimSpace(strings.TrimPrefix(line, "*"))
-		audio, err = TextToSoundEffects(
+		audio, historyID, err = TextToSoundEffects(
 			prompt,
-			3.0,
+			duration.Seconds(),
 			1.0,
 			"mp3_44100_128",
 		)
@@ -37,11 +35,15 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, err error) {
 		fileName = fmt.Sprintf("sfx_%v.mp3", id)
 	} else {
 		// Esto es TTS normal
-		audio, err = TextToSpeechElevenlabs(line, "")
+		audio, historyID, err = TextToSpeechElevenlabs(line, "")
 		fileName = fmt.Sprintf("tts_%v.mp3", id)
+		duration, err = Mp3Duration(audio)
+		if err != nil {
+			return "", historyID, 0, err
+		}
 	}
 	if err != nil {
-		return "", err
+		return "", historyID, 0, err
 	}
 
 	if url, err = Upload(
@@ -53,15 +55,16 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, err error) {
 		"audio/mpeg",
 		true,
 	); err != nil {
-		return "", err
+		return "", historyID, 0, err
 	}
-	return url, nil
+
+	return url, historyID, duration, nil
 }
 
-func TextToSpeechElevenlabs(text, voice_id string) ([]byte, error) {
+func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 	apiKey := os.Getenv("ELEVEN_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("API key no encontrada en variables de entorno")
+		return nil, "", fmt.Errorf("API key no encontrada en variables de entorno")
 	}
 
 	client := resty.New()
@@ -86,18 +89,19 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, error) {
 		Post(url)
 	fmt.Printf("ElevenLabs status=%d body=%q\n", resp.StatusCode(), resp.String())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+	defer resp.RawBody().Close()
 	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("error ElevenLabs: %s", resp.String())
+		return nil, "", fmt.Errorf("error ElevenLabs: %s", resp.String())
 	}
 
-	defer resp.RawBody().Close()
+	historyID := resp.Header().Get("history_item_id")
 	audio, err := io.ReadAll(resp.RawBody())
 	if err != nil {
-		return nil, err
+		return nil, historyID, err
 	}
-	return audio, nil
+	return audio, historyID, nil
 }
 
 // TextToSoundEffects convierte una descripción en un efecto de sonido.
@@ -109,10 +113,10 @@ func TextToSoundEffects(
 	durationSeconds float64,
 	promptInfluence float64,
 	outputFormat string,
-) ([]byte, error) {
+) ([]byte, string, error) {
 	apiKey := os.Getenv("ELEVEN_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("API key no encontrada en variables de entorno")
+		return nil, "", fmt.Errorf("API key no encontrada en variables de entorno")
 	}
 
 	client := resty.New()
@@ -137,12 +141,52 @@ func TextToSoundEffects(
 		SetDoNotParseResponse(true).
 		Post(url)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+	defer resp.RawBody().Close()
+
+	historyID := resp.Header().Get("history_item_id")
 	if resp.StatusCode() != 200 {
-		return nil, fmt.Errorf("error ElevenLabs SFX: %s", resp.String())
+		return nil, historyID, fmt.Errorf("error ElevenLabs SFX: %s", resp.String())
 	}
 
-	defer resp.RawBody().Close()
-	return io.ReadAll(resp.RawBody())
+	audio, err := io.ReadAll(resp.RawBody())
+	return audio, historyID, err
+}
+
+func CharactersUsed(historyID string) (int, error) {
+	client := resty.New()
+	apiKey := os.Getenv("ELEVEN_API_KEY")
+
+	// Poll hasta 3 veces porque puede haber retardo de propagación.
+	for i := 0; i < 3; i++ {
+		resp, err := client.R().
+			SetHeader("xi-api-key", apiKey).
+			Get(fmt.Sprintf("https://api.elevenlabs.io/v1/history/%s", historyID))
+		if err != nil {
+			return 0, err
+		}
+		if resp.StatusCode() == 200 {
+			var data struct {
+				From int `json:"character_count_change_from"`
+				To   int `json:"character_count_change_to"`
+			}
+			if err := json.Unmarshal(resp.Body(), &data); err != nil {
+				return 0, err
+			}
+			return data.To - data.From, nil
+		}
+		time.Sleep(2 * time.Second) // pequeño back-off
+	}
+	return 0, fmt.Errorf("history item %s no disponible tras reintentos", historyID)
+}
+
+func Mp3Duration(b []byte) (time.Duration, error) {
+	d, err := mp3.NewDecoder(bytes.NewReader(b))
+	if err != nil {
+		return 0, err
+	}
+	// d.Length() = bytes de PCM (16-bit stereo) → 4 bytes por sample
+	samples := d.Length() / 4
+	return time.Duration(samples) * time.Second / time.Duration(d.SampleRate()), nil
 }

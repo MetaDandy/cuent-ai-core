@@ -39,7 +39,7 @@ func (h *Handler) FindById(c *fiber.Ctx) error {
 	dto, err := h.svc.FindByID(c.Params("id"))
 	if err != nil {
 		return helper.JSONError(c, http.StatusInternalServerError,
-			"Error obteniendo projecto", err.Error())
+			"Error obteniendo script", err.Error())
 	}
 	if dto == nil {
 		return helper.JSONError(c, http.StatusNotFound,

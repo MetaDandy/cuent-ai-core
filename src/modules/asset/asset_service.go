@@ -1,8 +1,15 @@
 package asset
 
 import (
+	"errors"
+	"path/filepath"
+	"strconv"
+
 	"github.com/MetaDandy/cuent-ai-core/helper"
+	"github.com/MetaDandy/cuent-ai-core/src/model"
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Service struct {
@@ -43,14 +50,77 @@ func (s *Service) FindByID(id string) (*AssetResponse, error) {
 	return &dto, nil
 }
 
-func (s *Service) Generate(id string) (*AssetResponse, error) {
+func (s *Service) GenerateOne(id string) (*AssetResponse, error) {
+	_, err := s.generate(id)
+	if err != nil {
+		return nil, err
+	}
+
+	reload, _ := s.repo.FindByIdWithGeneratedJobs(id)
+	dto := AssetToDto(reload)
+	return &dto, nil
+}
+
+func (s *Service) generate(id string) (*model.Asset, error) {
 	asset, err := s.repo.FindById(id)
 	if err != nil {
 		return nil, err
 	}
 
-	// ! Lógica de la generación
+	bucket := "audio"
+	dirPath := filepath.Join(asset.Script.ProjectID.String(), asset.ID.String())
 
-	dto := AssetToDto(asset)
-	return &dto, nil
+	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		url, historyID, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath)
+		if err != nil {
+			return err
+		}
+
+		chars, err := helper.CharactersUsed(historyID)
+		if err != nil {
+			chars = 0
+		}
+
+		asset.Audio_URL = url
+		asset.AudioState = model.StateFinished
+		asset.Duration = uint(duration.Seconds())
+		if err := tx.Save(asset).Error; err != nil {
+			return err
+		}
+
+		job := model.GeneratedJob{
+			ID:          uuid.New(),
+			Provider:    model.ProviderElevenlab,
+			Model:       "eleven_monolingual_v1",
+			Chars_Used:  uint(chars),
+			Token_Spent: strconv.Itoa(chars),
+			State:       model.StateFinished,
+			Cost:        float64(chars) / 1000 * 0.30, // tarifa por 1 K caracteres
+			AssetID:     asset.ID,
+		}
+		if err := tx.Create(&job).Error; err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		asset.AudioState = model.StateError
+		asset.Audio_URL = ""
+		asset.Duration = 0
+		badJob := model.GeneratedJob{
+			Error_Message: err.Error(),
+			AssetID:       asset.ID,
+			State:         model.StateError,
+		}
+
+		if e := s.repo.Update(asset); e != nil {
+			err = errors.Join(err, e) // Go 1.20+
+		}
+		if e := s.genRepo.Create(&badJob); e != nil {
+			err = errors.Join(err, e)
+		}
+		return nil, err
+	}
+
+	return asset, nil
 }

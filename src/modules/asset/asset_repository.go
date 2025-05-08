@@ -42,6 +42,16 @@ func (r *Repository) FindById(id string) (*model.Asset, error) {
 	return &asset, nil
 }
 
+func (r *Repository) FindByIdWithGeneratedJobs(id string) (*model.Asset, error) {
+	var asset model.Asset
+	err := r.db.Preload("GeneratedJobs").First(&asset, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &asset, nil
+}
+
 func (r *Repository) FindByIdUnscoped(id string) (*model.Asset, error) {
 	var asset model.Asset
 	err := r.db.Unscoped().First(&asset, "id = ?", id).Error
