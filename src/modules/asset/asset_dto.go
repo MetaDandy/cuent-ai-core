@@ -45,3 +45,11 @@ func AssetToDto(u *model.Asset) AssetResponse {
 		DeletedAt: deletedAt,
 	}
 }
+
+func AssetsToListDTO(list []model.Asset) []AssetResponse {
+	out := make([]AssetResponse, len(list))
+	for i := range list {
+		out[i] = AssetToDto(&list[i])
+	}
+	return out
+}
