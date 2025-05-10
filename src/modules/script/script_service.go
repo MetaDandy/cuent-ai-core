@@ -22,7 +22,6 @@ func NewService(r *Repository, pr *project.Repository, ar *asset.Repository) *Se
 /**
 TODO:
 - para los mixed, crear endpoints especiales
-- Crear un endpoint para traer todos los assets de un script
 - Resolver todos los comentarios con !
 */
 
@@ -76,7 +75,6 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 		return nil, err
 	}
 
-	// ! Ver si creamos un findby id que busque con relaciones con assets
 	reload, _ := s.repo.FindByIdWithAssets(script.ID.String())
 	dto := ScriptToDTO(reload)
 	return &dto, nil
@@ -105,7 +103,7 @@ func (s *Service) FindByID(id string) (*ScriptReponse, error) {
 		return nil, err
 	}
 	if finded == nil {
-		return nil, nil
+		return nil, err // ! Crear un error personalizado
 	}
 	dto := ScriptToDTO(finded)
 	return &dto, nil

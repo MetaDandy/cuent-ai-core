@@ -16,8 +16,9 @@ func NewHandler(s *Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
-	grp := router.Group("/scripts")
+	grp := router.Group("/assets")
 	grp.Get("", h.FindAll)
+	grp.Post("/:id", h.GenerateOne)
 	grp.Get("/:id", h.FindById)
 }
 

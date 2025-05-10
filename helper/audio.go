@@ -154,6 +154,7 @@ func TextToSoundEffects(
 	return audio, historyID, err
 }
 
+// ! Revisar método
 func CharactersUsed(historyID string) (int, error) {
 	client := resty.New()
 	apiKey := os.Getenv("ELEVEN_API_KEY")

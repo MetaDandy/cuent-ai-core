@@ -1,6 +1,7 @@
 package asset
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -39,7 +41,7 @@ func (s *Service) FindAll(opts *helper.FindAllOptions) (*helper.PaginatedRespons
 }
 
 func (s *Service) FindByID(id string) (*AssetResponse, error) {
-	finded, err := s.repo.FindById(id)
+	finded, err := s.repo.FindByIdWithGeneratedJobs(id)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +63,45 @@ func (s *Service) GenerateOne(id string) (*AssetResponse, error) {
 	return &dto, nil
 }
 
+func (s *Service) GenerateAll(id string) (*[]AssetResponse, error) {
+	assets, err := s.repo.FindByScriptID(id)
+	if err != nil {
+		return nil, err
+	}
+	if len(assets) == 0 {
+		empty := make([]AssetResponse, 0)
+		return &empty, nil
+	}
+
+	g, ctx := errgroup.WithContext(context.Background())
+
+	for _, a := range assets {
+		a := a // captura local requerida
+		g.Go(func() error {
+			// Abortamos si el contexto se canceló (otro asset falló)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				_, err := s.generate(a.ID.String())
+				return err // si falla, errgroup cancelará a los demás
+			}
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err // el primer error aborta el proceso completo
+	}
+
+	reloaded, err := s.repo.FindByScriptIDWithGeneratedJobs(id)
+	if err != nil {
+		return nil, err
+	}
+	dto := AssetsToListDTO(reloaded)
+
+	return &dto, nil
+}
+
 func (s *Service) generate(id string) (*model.Asset, error) {
 	asset, err := s.repo.FindById(id)
 	if err != nil {
@@ -68,7 +109,7 @@ func (s *Service) generate(id string) (*model.Asset, error) {
 	}
 
 	bucket := "audio"
-	dirPath := filepath.Join(asset.Script.ProjectID.String(), asset.ID.String())
+	dirPath := filepath.Join(asset.ScriptID.String(), asset.Script.UpdatedAt.String())
 
 	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
 		url, historyID, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath)
