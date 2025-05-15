@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +22,6 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string
 		audio    []byte
 		fileName string
 	)
-
 	duration = 3 * time.Second
 
 	if strings.HasPrefix(line, "*") {
@@ -36,12 +37,16 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string
 	} else {
 		// Esto es TTS normal
 		audio, historyID, err = TextToSpeechElevenlabs(line, "")
+		if err != nil {
+			return "", historyID, 0, err
+		}
 		fileName = fmt.Sprintf("tts_%v.mp3", id)
 		duration, err = Mp3Duration(audio)
 		if err != nil {
 			return "", historyID, 0, err
 		}
 	}
+
 	if err != nil {
 		return "", historyID, 0, err
 	}
@@ -59,6 +64,37 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string
 	}
 
 	return url, historyID, duration, nil
+}
+
+func AudioOutputWithRetry(text, assetID, bucket, dirPath string) (url string, historyID string, duration time.Duration, err error) {
+	const maxRetries = 5
+	baseDelay := time.Second // tiempo base para el backoff
+
+	for attempt := range maxRetries {
+		url, historyID, duration, err = AudioOutput(text, assetID, bucket, dirPath)
+		if err == nil {
+			return url, historyID, duration, nil
+		}
+
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 429 {
+			retryAfter := httpErr.Header.Get("Retry-After")
+			wait := baseDelay * (1 << attempt)
+
+			if retryAfter != "" {
+				if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil {
+					wait = time.Duration(seconds) * time.Second
+				}
+			}
+
+			time.Sleep(wait)
+			continue
+		}
+
+		return "", "", 0, err
+	}
+
+	return "", "", 0, errors.New("excedidos reintentos por rate limit")
 }
 
 func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {

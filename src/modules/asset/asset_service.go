@@ -1,7 +1,6 @@
 package asset
 
 import (
-	"context"
 	"errors"
 	"path/filepath"
 	"strconv"
@@ -10,7 +9,6 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -73,24 +71,13 @@ func (s *Service) GenerateAll(id string) (*[]AssetResponse, error) {
 		return &empty, nil
 	}
 
-	g, ctx := errgroup.WithContext(context.Background())
+	var errs []error
 
+	// * No usar go rutine por el tema de los rate limits estrictos de eleven labs
 	for _, a := range assets {
-		a := a // captura local requerida
-		g.Go(func() error {
-			// Abortamos si el contexto se canceló (otro asset falló)
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				_, err := s.generate(a.ID.String())
-				return err // si falla, errgroup cancelará a los demás
-			}
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return nil, err // el primer error aborta el proceso completo
+		assetID := a.ID.String()
+		_, err := s.generate(assetID)
+		errs = append(errs, err)
 	}
 
 	reloaded, err := s.repo.FindByScriptIDWithGeneratedJobs(id)
@@ -98,6 +85,10 @@ func (s *Service) GenerateAll(id string) (*[]AssetResponse, error) {
 		return nil, err
 	}
 	dto := AssetsToListDTO(reloaded)
+
+	if len(errs) > 0 {
+		return &dto, errors.Join(errs...)
+	}
 
 	return &dto, nil
 }
@@ -149,6 +140,7 @@ func (s *Service) generate(id string) (*model.Asset, error) {
 		asset.Audio_URL = ""
 		asset.Duration = 0
 		badJob := model.GeneratedJob{
+			ID:            uuid.New(),
 			Error_Message: err.Error(),
 			AssetID:       asset.ID,
 			State:         model.StateError,
