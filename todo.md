@@ -1,7 +1,7 @@
 # TODO DEL BACKEND
 
 - [x] Solo generar los audios en el generate all cuando esta en status pending y error.
-- [] Crear las suscripciones y definir los tokens.
+- [x] Crear las suscripciones y definir los tokens.
 - [] Vincular las suscripciones a la tabla usario y hacer los handlers correspondiendtes.
 - [] Autenticar el usuario, y que por defecto tenga la suscripcion standar.
 - [] Protejer las rutas por medio de un jwt.

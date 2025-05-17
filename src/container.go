@@ -9,6 +9,7 @@ import (
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/script"
+	"github.com/MetaDandy/cuent-ai-core/src/modules/subscription"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 
@@ -47,6 +48,11 @@ type Container struct {
 
 	// Generated Job
 	GeneratedJobRepo *generatejob.Repository
+
+	// Subscription
+	SubsRepo *subscription.Repository
+	SubsSvc  *subscription.Service
+	SubsHdl  *subscription.Handler
 }
 
 func SetupContainer() *Container {
@@ -85,6 +91,11 @@ func SetupContainer() *Container {
 	scriptSvc := script.NewService(scriptRepo, projectRepo, assetRepo)
 	scriptHdl := script.NewHandler(scriptSvc)
 
+	// Subscription
+	subsRepo := subscription.NewRepository(config.DB)
+	subsSvc := subscription.NewService(subsRepo)
+	subsHdl := subscription.NewHandler(subsSvc)
+
 	return &Container{
 		// TTS
 		TtsSvc:     ttsSvc,
@@ -120,5 +131,10 @@ func SetupContainer() *Container {
 
 		//Generated Job
 		GeneratedJobRepo: generatedJobRepo,
+
+		// Subscription
+		SubsRepo: subsRepo,
+		SubsSvc:  subsSvc,
+		SubsHdl:  subsHdl,
 	}
 }
