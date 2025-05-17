@@ -20,6 +20,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("", h.FindAll)
 	grp.Post("/:id", h.GenerateOne)
 	grp.Post("/:id/generate_all", h.GenerateAll)
+	grp.Post("/:id/regenerate_all", h.RegenerateAll)
 	grp.Get("/:id", h.FindById)
 }
 
@@ -64,14 +65,31 @@ func (h *Handler) GenerateOne(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateAll(c *fiber.Ctx) error {
-	dto, err := h.svc.GenerateAll(c.Params("id"))
+	dto, err := h.svc.GenerateAll(c.Params("id"), false)
 	if err != nil {
-		return helper.JSONError(c, http.StatusInternalServerError,
-			"Error todos los assets", err.Error())
+		return c.JSON(helper.Response{
+			Data:    dto,
+			Message: err.Error(),
+		})
 	}
 
 	return c.JSON(helper.Response{
 		Data:    dto,
 		Message: "assets generados",
+	})
+}
+
+func (h *Handler) RegenerateAll(c *fiber.Ctx) error {
+	dto, err := h.svc.GenerateAll(c.Params("id"), true)
+	if err != nil {
+		return c.JSON(helper.Response{
+			Data:    dto,
+			Message: err.Error(),
+		})
+	}
+
+	return c.JSON(helper.Response{
+		Data:    dto,
+		Message: "assets regenerados",
 	})
 }

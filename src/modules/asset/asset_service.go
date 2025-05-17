@@ -61,7 +61,7 @@ func (s *Service) GenerateOne(id string) (*AssetResponse, error) {
 	return &dto, nil
 }
 
-func (s *Service) GenerateAll(id string) (*[]AssetResponse, error) {
+func (s *Service) GenerateAll(id string, regenerate bool) (*[]AssetResponse, error) {
 	assets, err := s.repo.FindByScriptID(id)
 	if err != nil {
 		return nil, err
@@ -76,8 +76,17 @@ func (s *Service) GenerateAll(id string) (*[]AssetResponse, error) {
 	// * No usar go rutine por el tema de los rate limits estrictos de eleven labs
 	for _, a := range assets {
 		assetID := a.ID.String()
-		_, err := s.generate(assetID)
-		errs = append(errs, err)
+		var err error
+		if regenerate {
+			_, err = s.generate(assetID)
+		} else {
+			if a.AudioState == model.StatePending || a.AudioState == model.StateError {
+				_, err = s.generate(assetID)
+			}
+		}
+		if err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	reloaded, err := s.repo.FindByScriptIDWithGeneratedJobs(id)
