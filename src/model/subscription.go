@@ -10,7 +10,7 @@ import (
 type Subscription struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey;"`
 	Name       string    `gorm:"not null"`
-	Cuentokens string
+	Cuentokens uint
 	Duration   time.Time
 
 	UsersSubscriptions []UserSubscribed `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`

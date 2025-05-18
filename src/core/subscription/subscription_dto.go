@@ -9,7 +9,7 @@ import (
 type SubscriptionResponse struct {
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
-	Cuentokens string    `json:"cuent_tokens"`
+	Cuentokens uint      `json:"cuent_tokens"`
 	Duration   time.Time `json:"duration"`
 
 	// ponser user subscription si se necesita

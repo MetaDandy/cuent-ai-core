@@ -11,5 +11,6 @@ type PaginatedResponse[T any] struct {
 // Todo: Revisar el tema del any, ver si poner T o no
 type Response struct {
 	Data    any    `json:"data"`
+	Token   string `json:"token,omitempty"`
 	Message string `json:"message"`
 }

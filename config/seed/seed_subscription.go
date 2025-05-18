@@ -31,25 +31,25 @@ func SeedSubscriptions(db *gorm.DB) error {
 		{
 			ID:         uuid.New(),
 			Name:       "Free",
-			Cuentokens: "1000",
+			Cuentokens: 1000,
 			Duration:   makeDuration(30),
 		},
 		{
 			ID:         uuid.New(),
 			Name:       "Standard", // plan base
-			Cuentokens: "5000",
+			Cuentokens: 5000,
 			Duration:   makeDuration(30),
 		},
 		{
 			ID:         uuid.New(),
 			Name:       "Pro",
-			Cuentokens: "25000",
+			Cuentokens: 25000,
 			Duration:   makeDuration(30),
 		},
 		{
 			ID:         uuid.New(),
 			Name:       "Enterprise",
-			Cuentokens: "100000",
+			Cuentokens: 100000,
 			Duration:   makeDuration(30),
 		},
 	}

@@ -2,6 +2,7 @@ package seed
 
 import (
 	"log"
+	"time"
 
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/google/uuid"
@@ -28,6 +29,13 @@ func SeedUser(db *gorm.DB) error {
 		log.Fatalf("❌ Error buscando usuario admin: %v", err)
 	}
 
+	var free model.Subscription
+	err = db.First(&free, "LOWER(name) = ?", "free").Error
+	if err != nil {
+		log.Printf("⚠️ Suscripción gratuita no encontrada.")
+		return nil
+	}
+
 	// 2) Generar hash de la contraseña
 	hash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -35,20 +43,29 @@ func SeedUser(db *gorm.DB) error {
 	}
 
 	// 3) Construir registro
-	user := model.User{
+	user := &model.User{
 		ID:       uuid.New(),
 		Name:     adminName,
 		Email:    adminEmail,
 		Password: string(hash),
 	}
 
+	sub := &model.UserSubscribed{
+		ID:              uuid.New(),
+		UserID:          user.ID,
+		SubscriptionID:  free.ID,
+		StartDate:       time.Now(),
+		EndDate:         time.Now().AddDate(0, 1, 0), // +30 días
+		TokensRemaining: free.Cuentokens,             // o lo que corresponda
+	}
+
 	// 4) Crear en una transacción
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&user).Error; err != nil {
+		if err := tx.Create(user).Error; err != nil {
 			return err
 		}
-		// Ejemplo: si quisieras asociar roles aquí, hazlo dentro del mismo tx.
-		return nil
+
+		return tx.Create(sub).Error
 	}); err != nil {
 		log.Fatalf("❌ Error creando usuario admin: %v", err)
 	}

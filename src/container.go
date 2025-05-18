@@ -2,6 +2,7 @@ package src
 
 import (
 	"github.com/MetaDandy/cuent-ai-core/config"
+	"github.com/MetaDandy/cuent-ai-core/src/core/subscription"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
@@ -9,7 +10,6 @@ import (
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/script"
-	"github.com/MetaDandy/cuent-ai-core/src/modules/subscription"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 

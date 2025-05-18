@@ -8,9 +8,11 @@ import (
 )
 
 type UserSubscribed struct {
-	ID               uuid.UUID `gorm:"type:uuid;primaryKey;"`
-	Total_Cuentokens string    `gorm:"not null"`
-	End_Date         time.Time
+	ID              uuid.UUID `gorm:"type:uuid;primaryKey;"`
+	TokensRemaining uint      `gorm:"column:total_cuentokens;not null"`
+	StartDate       time.Time
+	EndDate         time.Time
+	CanceledAt      *time.Time
 
 	UserID         uuid.UUID
 	User           User
