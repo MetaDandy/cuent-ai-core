@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
+	"github.com/MetaDandy/cuent-ai-core/middleware"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -16,7 +17,7 @@ func NewHandler(s *Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
-	grp := router.Group("/assets")
+	grp := router.Group("/assets").Use(middleware.JwtMiddleware())
 	grp.Get("", h.FindAll)
 	grp.Post("/:id", h.GenerateOne)
 	grp.Post("/:id/generate_all", h.GenerateAll)

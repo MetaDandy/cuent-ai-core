@@ -13,6 +13,8 @@ type Subscription struct {
 	Cuentokens uint
 	Duration   time.Time
 
+	// Poner un precio luego de la monetización
+
 	UsersSubscriptions []UserSubscribed `gorm:"foreignKey:SubscriptionID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 
 	CreatedAt time.Time
