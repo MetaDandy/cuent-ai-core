@@ -1,6 +1,7 @@
 package cuentai
 
 import (
+	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -15,6 +16,7 @@ func NewHandler(s *Service) *Handler {
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/cuentai")
 	grp.Post("/flow", h.CuentAIFlow)
+	grp.Post("/formatter", h.FormaterAI)
 }
 
 func (h *Handler) CuentAIFlow(c *fiber.Ctx) error {
@@ -26,6 +28,22 @@ func (h *Handler) CuentAIFlow(c *fiber.Ctx) error {
 	}
 
 	res, err := h.svc.CuentAIFlow(req.Text)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(res)
+}
+
+func (h *Handler) FormaterAI(c *fiber.Ctx) error {
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "JSON inválido")
+	}
+
+	res, err := helper.AIFormatter(req.Text)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}

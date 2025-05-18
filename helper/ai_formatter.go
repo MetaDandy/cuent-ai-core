@@ -1,6 +1,13 @@
 package helper
 
-import "strings"
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	"google.golang.org/genai"
+)
 
 type AIFormatterResponse struct {
 	Prompt_Tokens        uint32
@@ -10,60 +17,58 @@ type AIFormatterResponse struct {
 	Processed_Text_Array []string
 }
 
-// ! Cuando tengamos la api key de la ia cambiar la función
 func AIFormatter(text_entry string) (*AIFormatterResponse, error) {
-	// Aquí simulas la respuesta de la API tal como en el ejemplo de Python
-	response := `SACERDOTE.- Con oportunidad has hablado
-	Precisamente éstos me están indicando por señas que Creonte se acerca
-	* Entrance of Creon
-	EDIPO.- ¡Oh soberano Apolo! ¡Ojalá viniera con suerte liberadora, del mismo modo que viene con rostro radiante!
-	`
+	ctx := context.Background()
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:  os.Getenv("GEMINI_API_KEY"),
+		Backend: genai.BackendGeminiAPI,
+	})
+	if err != nil {
+		return nil, err
+	}
 
-	/**
-	SACERDOTE.- Por lo que se puede adivinar, viene complacido
-	En otro caso no vendría así, con la cabeza coronada de frondosas ramas de laurel
-	EDIPO.- Pronto lo sabremos, pues ya está lo suficientemente cerca para que nos escuche
-	¡Oh príncipe, mi pariente, hijo de Meneceo!
-	¿Cuál es la respuesta del oráculo?
-	CREONTE.- Con una buena
-	Afirmo que incluso las aflicciones, si llegan felizmente a término, todas pueden resultar bien
-	EDIPO.- ¿Cuál es la respuesta?
-	Por lo que acabas de decir, no estoy ni tranquilo ni tampoco preocupado
-	CREONTE.- Si deseas oírlo estando éstos aquí cerca, estoy dispuesto a hablar y también, si lo deseas, a ir dentro
-	EDIPO.- Habla ante todos, ya que por ellos sufro una aflicción mayor, incluso, que por mi propia vida
-	CREONTE.- Diré las palabras que escuché de parte del dios
-	El soberano Febo nos ordenó, claramente, arrojar de la región una mancilla que existe en esta tierra y no mantenerla para que llegue a ser irremediable
-	EDIPO.- ¿Con qué expiación?
-	¿Cuál es la naturaleza de la desgracia?
-	CREONTE.- Con el destierro o liberando un antiguo asesinato con otro, puesto que esta sangre es la que está sacudiendo la ciudad
-	EDIPO.- ¿De qué hombre denuncia tal desdicha?
-	CREONTE.- Teníamos nosotros, señor, en otro tiempo a Layo como soberano de esta tierra, antes de que tú rigieras rectamente esta ciudad
-	EDIPO.- Lo sé por haberlo oído, pero nunca lo vi
-	*/
+	propmt := fmt.Sprintf(`
+	You are a text-to-speech pre-processor.
+	Task:
+	1. Read the user text delimited by triple slash.
+	2. Split it into logical lines (one sentence or dialogue unit per line).
+	3. Whenever the text mentions or implies a sound effect
+	(e.g. shattering glass, footsteps, thunder), output a **separate** line
+	that starts with an asterisk (*) followed by a detailed English,
+	onomatopoeic description of the sound suitable for ElevenLabs
+	(Example: *shattering glass — sharp crystalline crack followed by tinkling fragments scattering on a hard tile floor*).
+	4. Keep the original language for normal narrative or dialogue lines;
+	only the sound-effect lines must be in English.
+	5. Return **only** the processed lines, one per output line, with no extra commentary.
+	///%s///
+	`, text_entry)
+
+	resp, err := client.Models.GenerateContent(
+		ctx,
+		os.Getenv("GEMINI_MODEL"),
+		genai.Text(propmt),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	out := resp.Text()
 
 	var lines []string
-	for _, line := range strings.Split(response, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed != "" {
 			lines = append(lines, trimmed)
 		}
 	}
 
-	// Cuando llamemmos a la ia cambiar esto
-	// resp, _ := client.CreateChatCompletion(ctx, req)
-	// script := Script{
-	// 	ID:               uuid.New(),
-	// 	Model:            resp.Model,
-	// 	PromptTokens:     uint32(resp.Usage.PromptTokens),
-	// 	CompletionTokens: uint32(resp.Usage.CompletionTokens),
-	// 	TotalTokens:      uint32(resp.Usage.TotalTokens),
-	// }
-
+	usage := resp.UsageMetadata
 	aiResponse := AIFormatterResponse{
-		Prompt_Tokens:        10,
-		Completion_Tokens:    10,
-		Total_Tokens:         10,
-		Processed_Text:       response,
+		Prompt_Tokens:        uint32(usage.PromptTokenCount),
+		Completion_Tokens:    uint32(usage.CandidatesTokenCount),
+		Total_Tokens:         uint32(usage.TotalTokenCount),
+		Processed_Text:       out,
 		Processed_Text_Array: lines,
 	}
 

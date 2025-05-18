@@ -5,9 +5,9 @@
 - [x] Crear las suscripciones y definir los tokens.
 - [x] Vincular las suscripciones a la tabla usario y hacer los handlers correspondiendtes.
 - [x] Autenticar el usuario, y que por defecto tenga la suscripcion free.
-- [] Protejer las rutas por medio de un jwt.
+- [x] Protejer las rutas por medio de un jwt.
 - [] Que todo el flujo de generacion use los tokens de la suscripcion.
-- [] Usar un modelo para la generación de los scripts.
+- [x] Usar un modelo para la generación de los scripts.
 - [] Cuando un Script se regenera, borrar logicamente los assets vinculados a el, junto con el borrado de las url de la tabla assets.
 - [] Implementar generacion de video.
 - [] Implementar el flujo de la generacion de video similar a el flujo de la generacion de audio.
