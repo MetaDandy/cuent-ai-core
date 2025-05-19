@@ -1,43 +1,68 @@
 package script
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/MetaDandy/cuent-ai-core/helper"
+	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct {
 	repo        *Repository
 	projectRepo *project.Repository
 	assetRepo   *asset.Repository
+	userRepo    *user.Repository
 }
 
-func NewService(r *Repository, pr *project.Repository, ar *asset.Repository) *Service {
-	return &Service{repo: r, projectRepo: pr, assetRepo: ar}
+func NewService(r *Repository, pr *project.Repository, ar *asset.Repository, ur *user.Repository) *Service {
+	return &Service{repo: r, projectRepo: pr, assetRepo: ar, userRepo: ur}
 }
 
 /**
 TODO:
 - para los mixed, crear endpoints especiales
-- Resolver todos los comentarios con !
 */
 
-func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
+func (s *Service) Create(userID string, input *ScriptCreate) (*ScriptReponse, error) {
 	project, err := s.projectRepo.FindById(input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
 	var script model.Script
-	// ! Contar los tokens para actualizar los tokens del proyecto
 	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		sub, err := s.userRepo.GetActiveSubscription(userID)
+		if err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", sub.ID).
+			Take(&sub).Error; err != nil {
+			return err
+		}
+
+		needed := helper.EstimateCuentokens(input.TextEntry)
+		if sub.TokensRemaining < needed {
+			return fmt.Errorf(
+				"fondos insuficientes: se necesitan aprox. %d cuentokens, tienes %d",
+				needed, sub.TokensRemaining,
+			)
+		}
+
 		aiResponse, err := helper.AIFormatter(input.TextEntry)
 		if err != nil {
 			return err
 		}
+
+		// Cobrar 1 cuentoken por linea
+		lines := len(aiResponse.Processed_Text_Array)
 
 		script = model.Script{
 			ID:                uuid.New(),
@@ -48,13 +73,23 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 			Total_Tokens:      aiResponse.Total_Tokens,
 			Processed_Text:    aiResponse.Processed_Text,
 			State:             model.StateFinished,
-			// ! Ver como calcular el total cost
+			Total_Cuentoken:   uint(lines),
 		}
 		if err := tx.Create(&script).Error; err != nil {
 			return err
 		}
 
-		assets := make([]model.Asset, 0, len(aiResponse.Processed_Text_Array))
+		if sub.TokensRemaining < uint(lines) {
+			sub.TokensRemaining = 0
+		} else {
+			sub.TokensRemaining = sub.TokensRemaining - uint(lines)
+		}
+
+		if err := tx.Save(sub).Error; err != nil {
+			return err
+		}
+
+		assets := make([]model.Asset, 0, lines)
 		for i, line := range aiResponse.Processed_Text_Array {
 			assets = append(assets, model.Asset{
 				ID:       uuid.New(),
@@ -68,7 +103,83 @@ func (s *Service) Create(input *ScriptCreate) (*ScriptReponse, error) {
 			return err
 		}
 
-		// ! Ver como actualizar los cuentokens del proyecto
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	reload, _ := s.repo.FindByIdWithAssets(script.ID.String())
+	dto := ScriptToDTO(reload)
+	return &dto, nil
+}
+
+func (s *Service) Regenerate(userID, scriptID string) (*ScriptReponse, error) {
+	script, err := s.repo.FindById(scriptID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		sub, err := s.userRepo.GetActiveSubscription(userID)
+		if err != nil {
+			return err
+		}
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&sub, "id = ?", sub.ID)
+
+		needed := 2 * helper.EstimateCuentokens(script.Text_Entry)
+		if sub.TokensRemaining < needed {
+			return fmt.Errorf(
+				"fondos insuficientes: se necesitan aprox. %d cuentokens, tienes %d",
+				needed, sub.TokensRemaining,
+			)
+		}
+
+		aiResponse, err := helper.AIFormatter(script.Text_Entry)
+		if err != nil {
+			return err
+		}
+
+		lines := 2 * len(aiResponse.Processed_Text_Array)
+
+		script.Prompt_Tokens = aiResponse.Prompt_Tokens
+		script.Completion_Tokens = aiResponse.Completion_Tokens
+		script.Total_Tokens = aiResponse.Total_Tokens
+		script.Processed_Text = aiResponse.Processed_Text
+		script.Total_Cuentoken += uint(lines)
+		if err := tx.Save(&script).Error; err != nil {
+			return err
+		}
+
+		if sub.TokensRemaining < uint(lines) {
+			sub.TokensRemaining = 0
+		} else {
+			sub.TokensRemaining = sub.TokensRemaining - uint(lines)
+		}
+
+		if err := tx.Save(&sub).Error; err != nil {
+			return err
+		}
+
+		if err := tx.
+			Where("script_id = ?", script.ID).
+			Delete(&model.Asset{}).Error; err != nil {
+			return err
+		}
+
+		assets := make([]model.Asset, 0, lines)
+		for i, line := range aiResponse.Processed_Text_Array {
+			assets = append(assets, model.Asset{
+				ID:       uuid.New(),
+				Type:     "LINE", // ! Hacer que sea un enum entre tts y sfx
+				Line:     line,
+				ScriptID: script.ID,
+				Position: i,
+			})
+		}
+		if err := tx.Create(&assets).Error; err != nil {
+			return err
+		}
 
 		return nil
 	}); err != nil {
@@ -103,7 +214,7 @@ func (s *Service) FindByID(id string) (*ScriptReponse, error) {
 		return nil, err
 	}
 	if finded == nil {
-		return nil, err // ! Crear un error personalizado
+		return nil, errors.New("no se encontró lo solicitado")
 	}
 	dto := ScriptToDTO(finded)
 	return &dto, nil

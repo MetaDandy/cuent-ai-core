@@ -21,9 +21,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("", h.FindAll)
 	grp.Get("/:id", h.FindById)
 	grp.Post("", h.Create)
-	// grp.Patch("/:id", h.Update)
-	// grp.Delete("/:id", h.SoftDelete)
-	// grp.Post("/:id", h.Restore)
+	grp.Patch("/:id/regenerate", h.Regenerate)
 }
 
 func (h *Handler) FindAll(c *fiber.Ctx) error {
@@ -54,12 +52,37 @@ func (h *Handler) FindById(c *fiber.Ctx) error {
 }
 
 func (h *Handler) Create(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
 	var input ScriptCreate
 	if err := c.BodyParser(&input); err != nil {
 		return helper.JSONError(c, http.StatusBadRequest,
 			"Input inválido", err.Error())
 	}
-	project, err := h.svc.Create(&input)
+
+	project, err := h.svc.Create(id, &input)
+	if err != nil {
+		return helper.JSONError(c, http.StatusInternalServerError,
+			"Error creando script", err.Error())
+	}
+	return c.Status(http.StatusCreated).JSON(helper.Response{
+		Data:    project,
+		Message: "Script creado",
+	})
+}
+
+func (h *Handler) Regenerate(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	project, err := h.svc.Regenerate(id, c.Params("id"))
 	if err != nil {
 		return helper.JSONError(c, http.StatusInternalServerError,
 			"Error creando script", err.Error())

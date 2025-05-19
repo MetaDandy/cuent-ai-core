@@ -2,6 +2,7 @@ package seed
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/MetaDandy/cuent-ai-core/src/model"
@@ -12,10 +13,10 @@ import (
 
 // SeedAdminUser asegura que exista un usuario administrador.
 func SeedUser(db *gorm.DB) error {
-	const (
-		adminName     = "Administrador"
-		adminEmail    = "admin@gmail.com"
-		adminPassword = "changeme123" // ⇢ luego cámbiala en producción
+	var (
+		adminName     = os.Getenv("ADMIN_NAME")
+		adminEmail    = os.Getenv("ADMIN_EMAIL")
+		adminPassword = os.Getenv("ADMIN_PASSWORD")
 	)
 
 	// 1) ¿Ya existe?

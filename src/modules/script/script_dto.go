@@ -17,16 +17,16 @@ type ScriptUpdate struct {
 }
 
 type ScriptReponse struct {
-	ID                string  `json:"id"`
-	Prompt_Tokens     uint32  `json:"promt_tokens"`
-	Completion_Tokens uint32  `json:"completion_tokens"`
-	Total_Tokens      uint32  `json:"total_tokens"`
-	State             string  `json:"state"`
-	Text_Entry        string  `json:"text_entry"`
-	Processed_Text    string  `json:"processed_text"`
-	Total_Cost        float64 `json:"total_cost"`
-	Mixed_Audio       string  `json:"mixed_audio"`
-	Mixed_Media       string  `json:"mixed_media"`
+	ID                string `json:"id"`
+	Prompt_Tokens     uint32 `json:"promt_tokens"`
+	Completion_Tokens uint32 `json:"completion_tokens"`
+	Total_Token       uint32 `json:"total_token"`
+	Total_Cuentoken   uint   `json:"total_cuentoken"`
+	State             string `json:"state"`
+	Text_Entry        string `json:"text_entry"`
+	Processed_Text    string `json:"processed_text"`
+	Mixed_Audio       string `json:"mixed_audio"`
+	Mixed_Media       string `json:"mixed_media"`
 
 	//Poner proyecto
 	Assets []asset.AssetResponse `json:"assets,omitempty"`
@@ -55,11 +55,11 @@ func ScriptToDTO(u *model.Script) ScriptReponse {
 		ID:                u.ID.String(),
 		Prompt_Tokens:     u.Prompt_Tokens,
 		Completion_Tokens: u.Completion_Tokens,
-		Total_Tokens:      u.Total_Tokens,
+		Total_Token:       u.Total_Tokens,
+		Total_Cuentoken:   u.Total_Cuentoken,
 		State:             string(u.State),
 		Text_Entry:        u.Text_Entry,
 		Processed_Text:    u.Processed_Text,
-		Total_Cost:        u.Total_Cost,
 		Mixed_Audio:       u.Mixed_Audio,
 		Mixed_Media:       u.Mixed_Media,
 		Assets:            assets,

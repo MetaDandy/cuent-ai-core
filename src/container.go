@@ -88,7 +88,7 @@ func SetupContainer() *Container {
 
 	// Script
 	scriptRepo := script.NewRepository(config.DB)
-	scriptSvc := script.NewService(scriptRepo, projectRepo, assetRepo)
+	scriptSvc := script.NewService(scriptRepo, projectRepo, assetRepo, userRepo)
 	scriptHdl := script.NewHandler(scriptSvc)
 
 	// Subscription

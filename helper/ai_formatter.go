@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	"google.golang.org/genai"
@@ -73,4 +74,38 @@ func AIFormatter(text_entry string) (*AIFormatterResponse, error) {
 	}
 
 	return &aiResponse, nil
+}
+
+// ! Función de emergencia buscar una solución mejor.
+// EstimateCuentokens devuelve una cota superior del número de líneas
+// (≈ cuentokens) que obtendrías tras formatear `text`.
+//
+// Estrategia:
+//  1. Cuenta las frases terminadas en ".", "!", "?".
+//  2. Añade las líneas ya existentes (separadas por \n) que NO terminan
+//     en esos signos (p. ej. diálogos separados con guion largo —).
+//  3. Añade un 10 % extra como colchón para posibles líneas SFX.
+func EstimateCuentokens(text string) uint {
+	// Paso 1: frases que terminan en . ! ?
+	re := regexp.MustCompile(`[^.!?]+[.!?]`)
+	frases := re.FindAllString(text, -1)
+	nFrases := len(frases)
+
+	// Paso 2: líneas “sueltas” (diálogos / listas) que no detectó el regex
+	nuevasLineas := 0
+	for _, l := range strings.Split(text, "\n") {
+		trim := strings.TrimSpace(l)
+		if trim == "" {
+			continue
+		}
+		if !re.MatchString(trim) { // no termina en . ! ?
+			nuevasLineas++
+		}
+	}
+
+	total := nFrases + nuevasLineas
+
+	// Paso 3: 10 % extra para sonidos (*SFX*)
+	extra := (total + 9) / 10 // redondeo hacia arriba
+	return uint(total + extra)
 }

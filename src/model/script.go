@@ -15,7 +15,7 @@ type Script struct {
 	State             State     `gorm:"type:state;default:'PENDING'"`
 	Text_Entry        string    `gorm:"not null"`
 	Processed_Text    string    `gorm:"not null"`
-	Total_Cost        float64   `gorm:"type:numeric(10,4);not null"`
+	Total_Cuentoken   uint      `gorm:"not null"`
 	Mixed_Audio       string
 	Mixed_Media       string
 

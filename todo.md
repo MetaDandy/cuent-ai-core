@@ -8,9 +8,10 @@
 - [x] Protejer las rutas por medio de un jwt.
 - [] Que todo el flujo de generacion use los tokens de la suscripcion.
 - [x] Usar un modelo para la generación de los scripts.
-- [] Cuando un Script se regenera, borrar logicamente los assets vinculados a el, junto con el borrado de las url de la tabla assets.
+- [x] Cuando un Script se regenera, borrar logicamente los assets vinculados a el, junto con el borrado de las url de la tabla assets.
 - [] Implementar generacion de video.
 - [] Implementar el flujo de la generacion de video similar a el flujo de la generacion de audio.
+- [] Dejar que el usuario cree de forma manual un asset sin cobrar porque no se usa la ia.
 - [] Implementar monetizacion y meter pasarela de pago.
 - [] Subir a aws.
 
