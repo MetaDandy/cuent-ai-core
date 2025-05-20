@@ -1,8 +1,11 @@
 package script
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
+	"path/filepath"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
@@ -167,6 +170,11 @@ func (s *Service) Regenerate(userID, scriptID string) (*ScriptReponse, error) {
 			return err
 		}
 
+		dirPath := filepath.Join(script.ID.String())
+		if err := helper.DeleteFolder(context.TODO(), "audio", dirPath); err != nil {
+			log.Printf("error borrando carpeta Supabase: %v", err)
+		}
+
 		assets := make([]model.Asset, 0, lines)
 		for i, line := range aiResponse.Processed_Text_Array {
 			assets = append(assets, model.Asset{
@@ -219,3 +227,18 @@ func (s *Service) FindByID(id string) (*ScriptReponse, error) {
 	dto := ScriptToDTO(finded)
 	return &dto, nil
 }
+
+// // ! Metodo de prueba borrar
+// func (s *Service) DeleteFolder(id string) (string, error) {
+// 	script, err := s.repo.FindById(id)
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	dirPath := filepath.Join(script.ID.String())
+// 	if err := helper.DeleteFolder(context.TODO(), "audio", dirPath); err != nil {
+// 		log.Printf("error borrando carpeta Supabase: %v", err)
+// 	}
+
+// 	return "Se borro la carpeta exitosamente", nil
+// }

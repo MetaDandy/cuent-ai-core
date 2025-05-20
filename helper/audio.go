@@ -17,7 +17,11 @@ import (
 )
 
 // ? Ver si enviar el context como parametro
-func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string, duration time.Duration, err error) {
+func AudioOutput(line, id, bucket, dirPath string) (
+	url, historyID, audioType string,
+	duration time.Duration,
+	err error,
+) {
 	var (
 		audio    []byte
 		fileName string
@@ -32,23 +36,25 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string
 			1.0,
 			"mp3_44100_128",
 		)
+		audioType = "SFX"
 
 		fileName = fmt.Sprintf("sfx_%v.mp3", id)
 	} else {
 		// Esto es TTS normal
 		audio, historyID, err = TextToSpeechElevenlabs(line, "")
 		if err != nil {
-			return "", historyID, 0, err
+			return "", historyID, "", 0, err
 		}
 		fileName = fmt.Sprintf("tts_%v.mp3", id)
 		duration, err = Mp3Duration(audio)
+		audioType = "TTS"
 		if err != nil {
-			return "", historyID, 0, err
+			return "", historyID, "", 0, err
 		}
 	}
 
 	if err != nil {
-		return "", historyID, 0, err
+		return "", historyID, "", 0, err
 	}
 
 	if url, err = Upload(
@@ -60,10 +66,10 @@ func AudioOutput(line, id, bucket, dirPath string) (url string, historyID string
 		"audio/mpeg",
 		true,
 	); err != nil {
-		return "", historyID, 0, err
+		return "", historyID, "", 0, err
 	}
 
-	return url, historyID, duration, nil
+	return url, historyID, audioType, duration, nil
 }
 
 func AudioOutputWithRetry(text, assetID, bucket, dirPath string) (url string, historyID string, duration time.Duration, err error) {
@@ -71,7 +77,7 @@ func AudioOutputWithRetry(text, assetID, bucket, dirPath string) (url string, hi
 	baseDelay := time.Second // tiempo base para el backoff
 
 	for attempt := range maxRetries {
-		url, historyID, duration, err = AudioOutput(text, assetID, bucket, dirPath)
+		url, historyID, _, duration, err = AudioOutput(text, assetID, bucket, dirPath)
 		if err == nil {
 			return url, historyID, duration, nil
 		}
@@ -191,6 +197,13 @@ func TextToSoundEffects(
 }
 
 // ! Revisar método
+// CharactersUsed obtiene el número de caracteres efectivos usados para generar
+// un audio en ElevenLabs, consultando el historial hasta tres veces si es necesario.
+//
+// historyID es el identificador del elemento de historial en ElevenLabs.
+//
+// Devuelve el número de caracteres usados (To – From) o un error si falla la
+// petición o si el historial no está disponible tras los reintentos.
 func CharactersUsed(historyID string) (int, error) {
 	client := resty.New()
 	apiKey := os.Getenv("ELEVEN_API_KEY")

@@ -2,23 +2,29 @@ package asset
 
 import (
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
+	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Service struct {
-	repo    *Repository
-	genRepo *generatejob.Repository
+	repo     *Repository
+	genRepo  *generatejob.Repository
+	userRepo *user.Repository
 }
 
-func NewService(r *Repository, gnr *generatejob.Repository) *Service {
-	return &Service{repo: r, genRepo: gnr}
+func NewService(r *Repository, gnr *generatejob.Repository, ur *user.Repository) *Service {
+	return &Service{repo: r, genRepo: gnr, userRepo: ur}
 }
 
 func (s *Service) FindAll(opts *helper.FindAllOptions) (*helper.PaginatedResponse[AssetResponse], error) {
@@ -50,8 +56,19 @@ func (s *Service) FindByID(id string) (*AssetResponse, error) {
 	return &dto, nil
 }
 
-func (s *Service) GenerateOne(id string) (*AssetResponse, error) {
-	_, err := s.generate(id)
+func (s *Service) FindByScriptID(id string) (*[]AssetResponse, error) {
+	assets, err := s.repo.FindByScriptID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	dto := AssetsToListDTO(assets)
+
+	return &dto, nil
+}
+
+func (s *Service) GenerateOne(id, userID string) (*AssetResponse, error) {
+	_, err := s.generate(id, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +78,7 @@ func (s *Service) GenerateOne(id string) (*AssetResponse, error) {
 	return &dto, nil
 }
 
-func (s *Service) GenerateAll(id string, regenerate bool) (*[]AssetResponse, error) {
+func (s *Service) GenerateAll(id, userID string, regenerate bool) (*[]AssetResponse, error) {
 	assets, err := s.repo.FindByScriptID(id)
 	if err != nil {
 		return nil, err
@@ -78,10 +95,10 @@ func (s *Service) GenerateAll(id string, regenerate bool) (*[]AssetResponse, err
 		assetID := a.ID.String()
 		var err error
 		if regenerate {
-			_, err = s.generate(assetID)
+			_, err = s.generate(assetID, userID)
 		} else {
 			if a.AudioState == model.StatePending || a.AudioState == model.StateError {
-				_, err = s.generate(assetID)
+				_, err = s.generate(assetID, userID)
 			}
 		}
 		if err != nil {
@@ -102,17 +119,42 @@ func (s *Service) GenerateAll(id string, regenerate bool) (*[]AssetResponse, err
 	return &dto, nil
 }
 
-func (s *Service) generate(id string) (*model.Asset, error) {
+func (s *Service) generate(id, userID string) (*model.Asset, error) {
 	asset, err := s.repo.FindById(id)
 	if err != nil {
 		return nil, err
 	}
 
+	sub, err := s.userRepo.GetActiveSubscription(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var tokens uint
+	if strings.HasPrefix(asset.Line, "*") {
+		tokens = 40
+	} else {
+		tokens = uint(utf8.RuneCountInString(asset.Line))
+	}
+
+	if sub.TokensRemaining < tokens {
+		return nil, fmt.Errorf(
+			"fondos insuficientes: se necesitan aprox. %d cuentokens, tienes %d",
+			tokens, sub.TokensRemaining,
+		)
+	}
+
 	bucket := "audio"
-	dirPath := filepath.Join(asset.ScriptID.String(), asset.Script.UpdatedAt.String())
+	dirPath := filepath.Join(asset.ScriptID.String())
 
 	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
-		url, historyID, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath)
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", sub.ID).
+			Take(&sub).Error; err != nil {
+			return err
+		}
+
+		url, historyID, _, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath)
 		if err != nil {
 			return err
 		}
@@ -130,21 +172,28 @@ func (s *Service) generate(id string) (*model.Asset, error) {
 		}
 
 		job := model.GeneratedJob{
-			ID:          uuid.New(),
-			Provider:    model.ProviderElevenlab,
-			Model:       "eleven_monolingual_v1",
-			Chars_Used:  uint(chars),
-			Token_Spent: strconv.Itoa(chars),
-			State:       model.StateFinished,
-			Cost:        float64(chars) / 1000 * 0.30, // tarifa por 1 K caracteres
-			AssetID:     asset.ID,
+			ID:              uuid.New(),
+			Provider:        model.ProviderElevenlab,
+			Model:           "eleven_monolingual_v1",
+			Chars_Used:      uint(chars),
+			Cuentoken_Spent: tokens,
+			Token_Spent:     strconv.Itoa(chars),
+			State:           model.StateFinished,
+			Cost:            float64(chars) / 1000 * 0.30, // tarifa por 1 K caracteres
+			AssetID:         asset.ID,
 		}
 		if err := tx.Create(&job).Error; err != nil {
 			return err
 		}
 
+		sub.TokensRemaining -= tokens
+		if err := tx.Save(sub).Error; err != nil {
+			return err
+		}
+
 		return nil
 	}); err != nil {
+		// ! Ver si es factible cobrar la mitad si ocurre un error
 		asset.AudioState = model.StateError
 		asset.Audio_URL = ""
 		asset.Duration = 0

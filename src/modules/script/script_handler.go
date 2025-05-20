@@ -22,6 +22,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("/:id", h.FindById)
 	grp.Post("", h.Create)
 	grp.Patch("/:id/regenerate", h.Regenerate)
+	// grp.Delete("/:id/folder", h.DeleteFolder)
 }
 
 func (h *Handler) FindAll(c *fiber.Ctx) error {
@@ -92,3 +93,15 @@ func (h *Handler) Regenerate(c *fiber.Ctx) error {
 		Message: "Script creado",
 	})
 }
+
+// func (h *Handler) DeleteFolder(c *fiber.Ctx) error {
+// 	folder, err := h.svc.DeleteFolder(c.Params("id"))
+// 	if err != nil {
+// 		return helper.JSONError(c, http.StatusInternalServerError,
+// 			"Error creando script", err.Error())
+// 	}
+// 	return c.Status(http.StatusCreated).JSON(helper.Response{
+// 		Data:    folder,
+// 		Message: "Carpeta borrada",
+// 	})
+// }

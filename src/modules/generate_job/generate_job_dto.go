@@ -7,14 +7,15 @@ import (
 )
 
 type GeneratedJobResponse struct {
-	ID            string  `json:"id"`
-	Provider      string  `json:"provider"`
-	Model         string  `json:"model"`
-	Token_Spent   string  `json:"token_spent"`
-	Chars_Used    uint    `json:"chars_used"`
-	State         string  `json:"state"`
-	Error_Message string  `json:"error_message"`
-	Cost          float64 `json:"cost"`
+	ID              string  `json:"id"`
+	Provider        string  `json:"provider"`
+	Model           string  `json:"model"`
+	Token_Spent     string  `json:"token_spent"`
+	Cuentoken_Spent uint    `json:"cuentoken_spent"`
+	Chars_Used      uint    `json:"chars_used"`
+	State           string  `json:"state"`
+	Error_Message   string  `json:"error_message"`
+	Cost            float64 `json:"cost"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -29,14 +30,15 @@ func GeneratedJobToDto(u *model.GeneratedJob) GeneratedJobResponse {
 	}
 
 	return GeneratedJobResponse{
-		ID:            u.ID.String(),
-		Provider:      string(u.Provider),
-		Model:         u.Model,
-		Token_Spent:   u.Token_Spent,
-		Chars_Used:    u.Chars_Used,
-		State:         string(u.State),
-		Error_Message: u.Error_Message,
-		Cost:          u.Cost,
+		ID:              u.ID.String(),
+		Provider:        string(u.Provider),
+		Model:           u.Model,
+		Token_Spent:     u.Token_Spent,
+		Cuentoken_Spent: u.Cuentoken_Spent,
+		Chars_Used:      u.Chars_Used,
+		State:           string(u.State),
+		Error_Message:   u.Error_Message,
+		Cost:            u.Cost,
 
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,

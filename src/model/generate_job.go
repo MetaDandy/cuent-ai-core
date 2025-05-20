@@ -9,14 +9,15 @@ import (
 )
 
 type GeneratedJob struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey;"`
-	Provider      Provider  `gorm:"type:provider;default:'ELEVENLAB'"`
-	Model         string
-	Token_Spent   string
-	Chars_Used    uint
-	State         State `gorm:"type:state;default:'PENDING'"`
-	Error_Message string
-	Cost          float64
+	ID              uuid.UUID `gorm:"type:uuid;primaryKey;"`
+	Provider        Provider  `gorm:"type:provider;default:'ELEVENLAB'"`
+	Model           string
+	Token_Spent     string
+	Cuentoken_Spent uint
+	Chars_Used      uint
+	State           State `gorm:"type:state;default:'PENDING'"`
+	Error_Message   string
+	Cost            float64
 
 	AssetID uuid.UUID
 	Asset   Asset

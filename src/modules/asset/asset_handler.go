@@ -19,10 +19,11 @@ func NewHandler(s *Service) *Handler {
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/assets").Use(middleware.JwtMiddleware())
 	grp.Get("", h.FindAll)
+	grp.Get("/:id", h.FindById)
+	grp.Get("/:id/script", h.FindByScriptID)
 	grp.Post("/:id", h.GenerateOne)
 	grp.Post("/:id/generate_all", h.GenerateAll)
 	grp.Post("/:id/regenerate_all", h.RegenerateAll)
-	grp.Get("/:id", h.FindById)
 }
 
 func (h *Handler) FindAll(c *fiber.Ctx) error {
@@ -52,8 +53,31 @@ func (h *Handler) FindById(c *fiber.Ctx) error {
 	})
 }
 
+func (h *Handler) FindByScriptID(c *fiber.Ctx) error {
+	dto, err := h.svc.FindByScriptID(c.Params("id"))
+	if err != nil {
+		return helper.JSONError(c, http.StatusInternalServerError,
+			"Error obteniendo asset", err.Error())
+	}
+	if dto == nil {
+		return helper.JSONError(c, http.StatusNotFound,
+			"asset no encontrado")
+	}
+
+	return c.JSON(helper.Response{
+		Data:    dto,
+		Message: "Todos los assets obtenidos",
+	})
+}
+
 func (h *Handler) GenerateOne(c *fiber.Ctx) error {
-	dto, err := h.svc.GenerateOne(c.Params("id"))
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	dto, err := h.svc.GenerateOne(c.Params("id"), id)
 	if err != nil {
 		return helper.JSONError(c, http.StatusInternalServerError,
 			"Error generando el asset", err.Error())
@@ -66,7 +90,13 @@ func (h *Handler) GenerateOne(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateAll(c *fiber.Ctx) error {
-	dto, err := h.svc.GenerateAll(c.Params("id"), false)
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	dto, err := h.svc.GenerateAll(c.Params("id"), id, false)
 	if err != nil {
 		return c.JSON(helper.Response{
 			Data:    dto,
@@ -81,7 +111,13 @@ func (h *Handler) GenerateAll(c *fiber.Ctx) error {
 }
 
 func (h *Handler) RegenerateAll(c *fiber.Ctx) error {
-	dto, err := h.svc.GenerateAll(c.Params("id"), true)
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	dto, err := h.svc.GenerateAll(c.Params("id"), id, true)
 	if err != nil {
 		return c.JSON(helper.Response{
 			Data:    dto,

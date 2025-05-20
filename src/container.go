@@ -83,7 +83,7 @@ func SetupContainer() *Container {
 
 	// Asset
 	assetRepo := asset.NewRepository(config.DB)
-	assetSvc := asset.NewService(assetRepo, generatedJobRepo)
+	assetSvc := asset.NewService(assetRepo, generatedJobRepo, userRepo)
 	assetHdl := asset.NewHandler(assetSvc)
 
 	// Script
