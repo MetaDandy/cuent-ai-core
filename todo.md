@@ -1,7 +1,7 @@
 # TODO DEL BACKEND
 
 - [x] Solo generar los audios en el generate all cuando esta en status pending y error.
-- [] Mixear los audios de un script en uno solo.
+- [x] Mixear los audios de un script en uno solo.
 - [x] Crear las suscripciones y definir los tokens.
 - [x] Vincular las suscripciones a la tabla usario y hacer los handlers correspondiendtes.
 - [x] Autenticar el usuario, y que por defecto tenga la suscripcion free.

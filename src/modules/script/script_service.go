@@ -228,17 +228,55 @@ func (s *Service) FindByID(id string) (*ScriptReponse, error) {
 	return &dto, nil
 }
 
-// // ! Metodo de prueba borrar
-// func (s *Service) DeleteFolder(id string) (string, error) {
-// 	script, err := s.repo.FindById(id)
-// 	if err != nil {
-// 		return "", err
-// 	}
+func (s *Service) MixAudio(id, userID string) (*ScriptReponse, error) {
+	script, err := s.repo.FindById(id)
+	if err != nil {
+		return nil, err
+	}
+	assets, err := s.repo.FindByIDWithAssetsPosition(id)
+	if err != nil {
+		return nil, err
+	}
 
-// 	dirPath := filepath.Join(script.ID.String())
-// 	if err := helper.DeleteFolder(context.TODO(), "audio", dirPath); err != nil {
-// 		log.Printf("error borrando carpeta Supabase: %v", err)
-// 	}
+	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		sub, err := s.userRepo.GetActiveSubscription(userID)
+		if err != nil {
+			return err
+		}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", sub.ID).
+			Take(&sub).Error; err != nil {
+			return err
+		}
 
-// 	return "Se borro la carpeta exitosamente", nil
-// }
+		needed := uint(len(assets))
+		if sub.TokensRemaining < needed {
+			return fmt.Errorf(
+				"fondos insuficientes: se necesitan aprox. %d cuentokens, tienes %d",
+				needed, sub.TokensRemaining,
+			)
+		}
+
+		url, err := helper.MixAudio(id, assets)
+		if err != nil {
+			return err
+		}
+
+		script.Total_Cuentoken += needed
+		script.Mixed_Audio = url
+		if err := tx.Save(&script).Error; err != nil {
+			return err
+		}
+
+		sub.TokensRemaining -= needed
+		if err := tx.Save(sub).Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	dto := ScriptToDTO(script)
+	return &dto, nil
+}

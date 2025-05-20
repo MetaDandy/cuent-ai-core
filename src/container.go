@@ -4,28 +4,13 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/config"
 	"github.com/MetaDandy/cuent-ai-core/src/core/subscription"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
-	tts "github.com/MetaDandy/cuent-ai-core/src/modules/Tts"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/asset"
-	"github.com/MetaDandy/cuent-ai-core/src/modules/cuentai"
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/project"
 	"github.com/MetaDandy/cuent-ai-core/src/modules/script"
-	"github.com/MetaDandy/cuent-ai-core/src/modules/supabase"
 )
 
 type Container struct {
-	// TTS
-	TtsSvc     *tts.Service
-	TtsHandler *tts.Handler
-
-	// CuentAI
-	CuentSvc     *cuentai.Service
-	CuentHandler *cuentai.Handler
-
-	// Supabase
-	SupaSvc     *supabase.Service
-	SupaHandler *supabase.Handler
-
 	// User
 	UserRepo *user.Repository
 	UserSvc  *user.Service
@@ -56,18 +41,6 @@ type Container struct {
 }
 
 func SetupContainer() *Container {
-	// TTS
-	ttsSvc := tts.NewService()
-	ttsHandler := tts.NewHandler(ttsSvc)
-
-	// Supabase
-	supaSvc := supabase.NewService()
-	supaHandler := supabase.NewHandler(supaSvc)
-
-	// CuentAI
-	cuentSvc := cuentai.NewService(ttsSvc, supaSvc)
-	cuentHandler := cuentai.NewHandler(cuentSvc)
-
 	// User
 	userRepo := user.NewRepository(config.DB)
 	userSvc := user.NewService(userRepo)
@@ -97,18 +70,6 @@ func SetupContainer() *Container {
 	subsHdl := subscription.NewHandler(subsSvc)
 
 	return &Container{
-		// TTS
-		TtsSvc:     ttsSvc,
-		TtsHandler: ttsHandler,
-
-		// CuentAI
-		CuentSvc:     cuentSvc,
-		CuentHandler: cuentHandler,
-
-		// Supabase
-		SupaSvc:     supaSvc,
-		SupaHandler: supaHandler,
-
 		// User
 		UserRepo: userRepo,
 		UserSvc:  userSvc,

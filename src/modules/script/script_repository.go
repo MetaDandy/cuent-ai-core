@@ -50,6 +50,15 @@ func (r *Repository) FindByIdWithAssets(id string) (*model.Script, error) {
 	return &script, nil
 }
 
+func (r *Repository) FindByIDWithAssetsPosition(scriptID string) ([]model.Asset, error) {
+	var assets []model.Asset
+	err := r.db.
+		Where("script_id = ?", scriptID).
+		Order("position").
+		Find(&assets).Error
+	return assets, err
+}
+
 func (r *Repository) FindByIdUnscoped(id string) (*model.Script, error) {
 	var script model.Script
 	err := r.db.Unscoped().First(&script, "id = ?", id).Error

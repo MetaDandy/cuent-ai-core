@@ -21,8 +21,8 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("", h.FindAll)
 	grp.Get("/:id", h.FindById)
 	grp.Post("", h.Create)
+	grp.Post("/:id/mixed", h.MixAudio)
 	grp.Patch("/:id/regenerate", h.Regenerate)
-	// grp.Delete("/:id/folder", h.DeleteFolder)
 }
 
 func (h *Handler) FindAll(c *fiber.Ctx) error {
@@ -94,14 +94,25 @@ func (h *Handler) Regenerate(c *fiber.Ctx) error {
 	})
 }
 
-// func (h *Handler) DeleteFolder(c *fiber.Ctx) error {
-// 	folder, err := h.svc.DeleteFolder(c.Params("id"))
-// 	if err != nil {
-// 		return helper.JSONError(c, http.StatusInternalServerError,
-// 			"Error creando script", err.Error())
-// 	}
-// 	return c.Status(http.StatusCreated).JSON(helper.Response{
-// 		Data:    folder,
-// 		Message: "Carpeta borrada",
-// 	})
-// }
+func (h *Handler) MixAudio(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	dto, err := h.svc.MixAudio(c.Params("id"), id)
+	if err != nil {
+		return helper.JSONError(c, http.StatusInternalServerError,
+			"Error al mixear assets", err.Error())
+	}
+	if dto == nil {
+		return helper.JSONError(c, http.StatusNotFound,
+			"Script no encontrado")
+	}
+
+	return c.JSON(helper.Response{
+		Data:    dto,
+		Message: "Mixeo de audio de assets generado",
+	})
+}
