@@ -13,9 +13,6 @@ func SetupApi(app *fiber.App, c *src.Container) {
 	})
 
 	handlers := []func(fiber.Router){
-		c.TtsHandler.RegisterTTSRoutes,
-		c.CuentHandler.RegisterRoutes,
-		c.SupaHandler.RegisterRoutes,
 		c.ProjectHdl.RegisterRoutes,
 		c.UserHdl.RegisterRoutes,
 		c.ScriptHdl.RegisterRoutes,

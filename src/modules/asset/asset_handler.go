@@ -24,6 +24,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Post("/:id", h.GenerateOne)
 	grp.Post("/:id/generate_all", h.GenerateAll)
 	grp.Post("/:id/regenerate_all", h.RegenerateAll)
+	grp.Post("/:id/generate_video", h.GenerateOneVideo)
 }
 
 func (h *Handler) FindAll(c *fiber.Ctx) error {
@@ -128,5 +129,24 @@ func (h *Handler) RegenerateAll(c *fiber.Ctx) error {
 	return c.JSON(helper.Response{
 		Data:    dto,
 		Message: "assets regenerados",
+	})
+}
+
+func (h *Handler) GenerateOneVideo(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	dto, err := h.svc.GenerateVideo(c.Params("id"), id)
+	if err != nil {
+		return helper.JSONError(c, http.StatusInternalServerError,
+			"Error generando el asset video", err.Error())
+	}
+
+	return c.JSON(helper.Response{
+		Data:    dto,
+		Message: "asset generado",
 	})
 }

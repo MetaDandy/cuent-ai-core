@@ -1,6 +1,8 @@
 package asset
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -180,6 +182,109 @@ func (s *Service) generate(id, userID string) (*model.Asset, error) {
 			Token_Spent:     strconv.Itoa(chars),
 			State:           model.StateFinished,
 			Cost:            float64(chars) / 1000 * 0.30, // tarifa por 1 K caracteres
+			AssetID:         asset.ID,
+		}
+		if err := tx.Create(&job).Error; err != nil {
+			return err
+		}
+
+		sub.TokensRemaining -= tokens
+		if err := tx.Save(sub).Error; err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		// ! Ver si es factible cobrar la mitad si ocurre un error
+		asset.AudioState = model.StateError
+		asset.Audio_URL = ""
+		asset.Duration = 0
+		badJob := model.GeneratedJob{
+			ID:            uuid.New(),
+			Error_Message: err.Error(),
+			AssetID:       asset.ID,
+			State:         model.StateError,
+		}
+
+		if e := s.repo.Update(asset); e != nil {
+			err = errors.Join(err, e) // Go 1.20+
+		}
+		if e := s.genRepo.Create(&badJob); e != nil {
+			err = errors.Join(err, e)
+		}
+		return nil, err
+	}
+
+	return asset, nil
+}
+
+func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
+	asset, err := s.repo.FindById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	sub, err := s.userRepo.GetActiveSubscription(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var duration int32
+	if asset.Duration < 5 {
+		duration = 5
+	} else if asset.Duration > 8 {
+		duration = 8
+	} else {
+		duration = int32(asset.Duration)
+	}
+
+	tokens := uint(duration) * 50
+
+	if sub.TokensRemaining < tokens {
+		return nil, fmt.Errorf(
+			"fondos insuficientes: se necesitan aprox. %d cuentokens, tienes %d",
+			tokens, sub.TokensRemaining,
+		)
+	}
+
+	bucket := "video"
+	dirPath := filepath.Join(asset.ScriptID.String())
+
+	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", sub.ID).
+			Take(&sub).Error; err != nil {
+			return err
+		}
+
+		rawVideo, err := helper.GenerateVideo(asset.Line, duration)
+		if err != nil {
+			return err
+		}
+
+		video := bytes.NewReader(rawVideo)
+
+		fileName := asset.ID.String() + ".mp4"
+
+		// ! Ver si unir la pista de audio y la pista de video.
+
+		url, err := helper.Upload(context.TODO(), bucket, dirPath, fileName, video, "video/mp4", false)
+		if err != nil {
+			return err
+		}
+
+		asset.Video_URL = url
+		asset.VideoState = model.StateFinished
+		if err := tx.Save(asset).Error; err != nil {
+			return err
+		}
+
+		job := model.GeneratedJob{
+			ID:              uuid.New(),
+			Provider:        model.ProviderGemini,
+			Model:           "veo_2",
+			Cuentoken_Spent: tokens,
+			State:           model.StateFinished,
 			AssetID:         asset.ID,
 		}
 		if err := tx.Create(&job).Error; err != nil {
