@@ -1,6 +1,8 @@
 package user
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -9,6 +11,7 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/google/uuid"
+	"github.com/stripe/stripe-go"
 	"gorm.io/gorm"
 )
 
@@ -167,6 +170,7 @@ func (s *Service) ChangePassword(id string, in *ChangePassoword) (*UserResponse,
 	return &dto, nil
 }
 
+// Crea una suscripción con status de pendiente
 func (s *Service) AddSubscription(userID, subsID string) (*UserSubscriptionResponse, error) {
 	user, err := s.repo.FindById(userID)
 	if err != nil {
@@ -187,13 +191,145 @@ func (s *Service) AddSubscription(userID, subsID string) (*UserSubscriptionRespo
 		EndDate:         time.Now().AddDate(0, 1, 0),
 	}
 
-	if err := s.repo.AddSubscription(subUser); err != nil {
+	if err := s.repo.CreatePendingSubscription(subUser); err != nil {
 		return nil, err
 	}
 
 	dto := UserSubscriptionToDto(subUser)
 
 	return &dto, nil
+}
+
+// Crea el pago y lo vincula a la suscripción creada previamente
+func (s *Service) PaySubscription(userID string, pay Payment) (*PaymentResponse, error) {
+	user, err := s.repo.FindById(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	sub, err := s.repo.FindUserSuscribedByID(pay.UserSuscribedID)
+	if err != nil {
+		return nil, err
+	}
+
+	stripeClient := helper.NewStripeClient()
+	ctx := context.Background()
+
+	if user.StripeCustomerID == "" {
+		cust, err := stripeClient.CreateCustomer(ctx, user.Email)
+		if err != nil {
+			return nil, err
+		}
+		user.StripeCustomerID = cust.ID
+		if err := s.repo.Update(user); err != nil {
+			return nil, err
+		}
+	}
+
+	payment_id := uuid.New()
+	sess, err := stripeClient.CreateSubscriptionSession(
+		ctx,
+		user.StripeCustomerID,
+		pay.PriceID, // ! Ver que es el price ID
+		"https://tu-dominio.com/success",
+		"https://tu-dominio.com/cancel",
+		map[string]string{
+			"subs_user_id": sub.ID.String(),
+			"payment_id":   payment_id.String(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	payment := &model.Payment{
+		ID:              payment_id,
+		UserID:          userID,
+		StripeSessionID: sess.ID,
+		Status:          model.StatePending,
+		UserSuscribedID: sub.ID.String(),
+	}
+	if err := s.repo.CreatePayment(payment); err != nil {
+		return nil, err
+	}
+
+	paymentR := PaymentResponse{
+		Session:   sess.URL,
+		PaymentID: payment.ID.String(),
+	}
+	return &paymentR, nil
+}
+
+// Webhook que verifica si el pago fue correcto o no
+func (s *Service) StripeWebhook(event stripe.Event) (*UserSubscriptionResponse, error) {
+	stripeClient := helper.NewStripeClient()
+	switch event.Type {
+	case "checkout.session.completed":
+		var sess stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
+			return nil, err
+		}
+		pi, err := helper.GetPaymentIntent(sess.PaymentIntent.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		subsUserID := sess.Metadata["subs_user_id"]
+		paymentID := sess.Metadata["payment_id"]
+		sub, err := s.repo.FindUserSuscribedByID(subsUserID)
+		if err != nil {
+			return nil, err
+		}
+		payment, err := s.repo.FindPaymentID(paymentID)
+		if err != nil {
+			return nil, err
+		}
+
+		payment.Status = model.StateActive
+		payment.Amount = int(pi.Amount)
+		payment.Currency = string(pi.Currency)
+		payment.StripePaymentIntentID = sess.PaymentIntent.ID
+		if err := s.repo.UpdatePayment(payment); err != nil {
+			return nil, err
+		}
+
+		sub.Status = model.StateActive
+		sub.StartDate = time.Now()
+		sub.EndDate = time.Now().AddDate(0, 1, 0)
+		if err := s.repo.UpdateUserSuscribed(sub); err != nil {
+			return nil, err
+		}
+		s.repo.ClosePreviousSubscriptions(sub.ID.String())
+
+		dto := UserSubscriptionToDto(sub)
+		return &dto, nil
+
+	case "invoice.payment_failed":
+		var inv stripe.Invoice
+		if err := json.Unmarshal(event.Data.Raw, &inv); err != nil {
+			return nil, err
+		}
+
+		subObj, err := stripeClient.GetSubscription(context.Background(), inv.Subscription.ID)
+		if err != nil {
+			return nil, err
+		}
+		paymentID := subObj.Metadata["payment_id"]
+		payment, err := s.repo.FindPaymentID(paymentID)
+		if err != nil {
+			return nil, err
+		}
+
+		payment.Status = model.StateError
+		payment.Amount = int(inv.AmountDue)
+		payment.Currency = string(inv.Currency)
+		if err := s.repo.UpdatePayment(payment); err != nil {
+			return nil, err
+		}
+
+		return nil, errors.New("pago fallido")
+	}
+	return nil, errors.New("métodos no soportados")
 }
 
 func (s *Service) GetActiveSubscription(id string) (*UserSubscriptionResponse, error) {

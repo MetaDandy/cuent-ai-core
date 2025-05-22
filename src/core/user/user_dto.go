@@ -25,6 +25,16 @@ type ChangePassoword struct {
 	Confirm_Password string `json:"confirm_password"`
 }
 
+type Payment struct {
+	UserSuscribedID string `json:"user_suscribed_id"`
+	PriceID         string `json:"price_id"`
+}
+
+type PaymentResponse struct {
+	Session   string `json:"session"`
+	PaymentID string `json:"payment_id"`
+}
+
 type UserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`

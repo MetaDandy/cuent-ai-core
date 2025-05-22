@@ -62,6 +62,47 @@ func (r *Repository) Update(u *model.User) error {
 	return r.db.Save(u).Error
 }
 
+func (r *Repository) CreatePendingSubscription(sub *model.UserSubscribed) error {
+	return r.db.Create(sub).Error
+}
+
+func (r *Repository) FindUserSuscribedByID(id string) (*model.UserSubscribed, error) {
+	var sub *model.UserSubscribed
+	err := r.db.
+		Preload("Subscription").
+		First(&sub, "id = ?", id).Error
+	return sub, err
+}
+
+func (r *Repository) UpdateUserSuscribed(u *model.UserSubscribed) error {
+	return r.db.Save(u).Error
+}
+
+func (r *Repository) FindPaymentID(id string) (*model.Payment, error) {
+	var pay *model.Payment
+	err := r.db.
+		Preload("Subscription").
+		Where("id = ?", id).
+		First(&pay).Error
+	return pay, err
+}
+
+func (r *Repository) UpdatePayment(u *model.Payment) error {
+	return r.db.Save(u).Error
+}
+
+func (r *Repository) ClosePreviousSubscriptions(userID string) error {
+	return r.db.
+		Model(&model.UserSubscribed{}).
+		Where("user_id = ? AND end_date >= ?", userID, time.Now()).
+		Update("end_date", time.Now()).
+		Error
+}
+
+func (r *Repository) CreatePayment(u *model.Payment) error {
+	return r.db.Create(u).Error
+}
+
 func (r *Repository) AddSubscription(sub *model.UserSubscribed) error {
 	return r.db.Transaction(func(tx *gorm.DB) error { // asegura consistencia :contentReference[oaicite:3]{index=3}
 		// 1. Anula cualquier suscripción activa anterior

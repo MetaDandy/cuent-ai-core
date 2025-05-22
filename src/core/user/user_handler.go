@@ -2,10 +2,12 @@ package user
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/middleware"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stripe/stripe-go/webhook"
 )
 
 type Handler struct {
@@ -20,6 +22,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/users")
 	grp.Post("/sign-up", h.SignUp)
 	grp.Post("/sign-in", h.SignIn)
+	grp.Post("/stripe-web-hook", h.StripeWebhook)
 
 	grp.Use(middleware.JwtMiddleware())
 
@@ -28,6 +31,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("/subscription", h.GetActiveSubscription)
 	grp.Get("/:id", h.FindById)
 	grp.Post("/:id/add-subscription", h.AddSubscription)
+	grp.Post("/payment-subscription", h.PaymentSubscription)
 	grp.Patch("/change-password", h.ChangePassoword)
 }
 
@@ -152,6 +156,53 @@ func (h *Handler) AddSubscription(c *fiber.Ctx) error {
 	return c.Status(http.StatusCreated).JSON(helper.Response{
 		Data:    data,
 		Message: "Suscripción añadida",
+	})
+}
+
+func (h *Handler) StripeWebhook(c *fiber.Ctx) error {
+	payload := c.Body()
+	sigHeader := c.Get("Stripe-Signature")
+
+	// 2. Validar y construir evento
+	endpointSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
+	event, err := webhook.ConstructEvent(payload, sigHeader, endpointSecret)
+	if err != nil {
+		return c.Status(400).SendString("Webhook signature verification failed")
+	}
+
+	resp, err := h.svc.StripeWebhook(event)
+	if err != nil {
+		return helper.JSONError(c, http.StatusInternalServerError,
+			"Error en el evento del webhook", err.Error())
+	}
+	return c.Status(http.StatusCreated).JSON(helper.Response{
+		Data:    resp,
+		Message: "Suscripción activada",
+	})
+}
+
+func (h *Handler) PaymentSubscription(c *fiber.Ctx) error {
+	var payment Payment
+	if err := c.BodyParser(&payment); err != nil {
+		return helper.JSONError(c, http.StatusBadRequest,
+			"Pago invalido", err.Error())
+	}
+
+	id, ok := c.Locals("user_id").(string)
+	if !ok || id == "" {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Token sin user_id", "")
+	}
+
+	data, err := h.svc.PaySubscription(id, payment)
+	if err != nil {
+		return helper.JSONError(c, http.StatusUnauthorized,
+			"Error en el pago", "")
+	}
+
+	return c.Status(http.StatusCreated).JSON(helper.Response{
+		Data:    data,
+		Message: "Procesando pago",
 	})
 }
 
