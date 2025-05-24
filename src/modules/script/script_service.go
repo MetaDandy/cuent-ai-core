@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"strings"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
@@ -27,11 +28,6 @@ type Service struct {
 func NewService(r *Repository, pr *project.Repository, ar *asset.Repository, ur *user.Repository) *Service {
 	return &Service{repo: r, projectRepo: pr, assetRepo: ar, userRepo: ur}
 }
-
-/**
-TODO:
-- para los mixed, crear endpoints especiales
-*/
 
 func (s *Service) Create(userID string, input *ScriptCreate) (*ScriptReponse, error) {
 	project, err := s.projectRepo.FindById(input.ProjectID)
@@ -94,10 +90,68 @@ func (s *Service) Create(userID string, input *ScriptCreate) (*ScriptReponse, er
 
 		assets := make([]model.Asset, 0, lines)
 		for i, line := range aiResponse.Processed_Text_Array {
+			var typeAudio string
+			if strings.HasPrefix(line, "*") {
+				typeAudio = string(model.AudioSFX)
+			} else {
+				typeAudio = string(model.AudioTTS)
+			}
+
 			assets = append(assets, model.Asset{
 				ID:       uuid.New(),
-				Type:     "LINE", // ! Hacer que sea un enum entre tts y sfx
+				Type:     model.AudioLine(typeAudio), // ! Hacer que sea un enum entre tts y sfx
 				Line:     line,
+				ScriptID: script.ID,
+				Position: i,
+			})
+		}
+		if err := tx.Create(&assets).Error; err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	reload, _ := s.repo.FindByIdWithAssets(script.ID.String())
+	dto := ScriptToDTO(reload)
+	return &dto, nil
+}
+
+func (s *Service) ManualCreate(manual *ScriptManualCreate) (*ScriptReponse, error) {
+	project, err := s.projectRepo.FindById(manual.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+
+	var script model.Script
+	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
+		var sb strings.Builder
+		for i, l := range manual.Lines {
+			if i > 0 {
+				sb.WriteRune('\n')
+			}
+			sb.WriteString(l.Text)
+		}
+		textEntry := sb.String()
+
+		script = model.Script{
+			ID:         uuid.New(),
+			Text_Entry: textEntry,
+			ProjectID:  project.ID,
+			State:      model.StateFinished,
+		}
+		if err := tx.Create(&script).Error; err != nil {
+			return err
+		}
+
+		assets := make([]model.Asset, 0, len(manual.Lines))
+		for i, line := range manual.Lines {
+			assets = append(assets, model.Asset{
+				ID:       uuid.New(),
+				Type:     line.Type,
+				Line:     line.Text,
 				ScriptID: script.ID,
 				Position: i,
 			})

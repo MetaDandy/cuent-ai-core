@@ -1,6 +1,8 @@
 package model
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,7 +11,7 @@ import (
 
 type Asset struct {
 	ID         uuid.UUID `gorm:"type:uuid;primaryKey;"`
-	Type       string    // ? Ver si poner un enum de sfx o tts
+	Type       AudioLine `gorm:"type:audio_line;default:'TTS'"`
 	Video_URL  string
 	Audio_URL  string
 	Line       string
@@ -26,4 +28,31 @@ type Asset struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+type AudioLine string
+
+const (
+	AudioTTS AudioLine = "TTS"
+	AudioSFX AudioLine = "SFX"
+)
+
+func (a *AudioLine) Scan(v interface{}) error {
+	if v == nil {
+		*a = ""
+		return nil
+	}
+	switch s := v.(type) {
+	case string:
+		*a = AudioLine(s)
+	case []byte:
+		*a = AudioLine(string(s))
+	default:
+		return fmt.Errorf("no se puede convertir %T a AudioLine", v)
+	}
+	return nil
+}
+
+func (a AudioLine) Value() (driver.Value, error) {
+	return string(a), nil
 }

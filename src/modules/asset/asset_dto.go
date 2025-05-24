@@ -40,7 +40,7 @@ func AssetToDto(u *model.Asset) AssetResponse {
 
 	return AssetResponse{
 		ID:         u.ID.String(),
-		Type:       u.Type,
+		Type:       string(u.Type),
 		Video_URL:  u.Video_URL,
 		Audio_URL:  u.Audio_URL,
 		Line:       u.Line,

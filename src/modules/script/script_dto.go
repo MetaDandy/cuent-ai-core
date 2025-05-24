@@ -12,6 +12,16 @@ type ScriptCreate struct {
 	ProjectID string `json:"project_id" validate:"required"`
 }
 
+type Line struct {
+	Text string          `json:"text" validate:"required"`
+	Type model.AudioLine `json:"type" validate:"required,oneof=TTS SFX"`
+}
+
+type ScriptManualCreate struct {
+	Lines     []Line `json:"lines" validate:"required,dive"`
+	ProjectID string `json:"project_id" validate:"required,uuid"`
+}
+
 type ScriptUpdate struct {
 	TextEntry *string `json:"text_entry"`
 }
@@ -28,7 +38,6 @@ type ScriptReponse struct {
 	Mixed_Audio       string `json:"mixed_audio"`
 	Mixed_Media       string `json:"mixed_media"`
 
-	//Poner proyecto
 	Assets []asset.AssetResponse `json:"assets,omitempty"`
 
 	CreatedAt time.Time  `json:"created_at"`

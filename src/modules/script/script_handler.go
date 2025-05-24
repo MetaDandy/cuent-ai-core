@@ -21,6 +21,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	grp.Get("", h.FindAll)
 	grp.Get("/:id", h.FindById)
 	grp.Post("", h.Create)
+	grp.Post("/manual-create", h.ManualCreate)
 	grp.Post("/:id/mixed", h.MixAudio)
 	grp.Patch("/:id/regenerate", h.Regenerate)
 }
@@ -72,6 +73,25 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	}
 	return c.Status(http.StatusCreated).JSON(helper.Response{
 		Data:    project,
+		Message: "Script creado",
+	})
+}
+
+func (h *Handler) ManualCreate(c *fiber.Ctx) error {
+	var input ScriptManualCreate
+	if err := c.BodyParser(&input); err != nil {
+		return helper.JSONError(c, fiber.StatusBadRequest,
+			"Input inválido", err.Error())
+	}
+
+	script, err := h.svc.ManualCreate(&input)
+	if err != nil {
+		return helper.JSONError(c, fiber.StatusInternalServerError,
+			"Error creando script", err.Error())
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(helper.Response{
+		Data:    script,
 		Message: "Script creado",
 	})
 }
