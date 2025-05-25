@@ -10,7 +10,3 @@ services:
       - PORT=${PORT}
       - DATABASE_URL=${DATABASE_URL}
       - GOFLAGS=-buildvcs=false
-    volumes:
-      - .:/app
-      - /go/pkg/mod
-      - /app/tmp
