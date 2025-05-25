@@ -133,13 +133,19 @@ func (h *Handler) RegenerateAll(c *fiber.Ctx) error {
 }
 
 func (h *Handler) GenerateOneVideo(c *fiber.Ctx) error {
+	var key_words GenerateVideo
+	if err := c.BodyParser(&key_words); err != nil {
+		return helper.JSONError(c, http.StatusBadRequest,
+			"Input inválido", err.Error())
+	}
+
 	id, ok := c.Locals("user_id").(string)
 	if !ok || id == "" {
 		return helper.JSONError(c, http.StatusUnauthorized,
 			"Token sin user_id", "")
 	}
 
-	dto, err := h.svc.GenerateVideo(c.Params("id"), id)
+	dto, err := h.svc.GenerateVideo(c.Params("id"), id, key_words)
 	if err != nil {
 		return helper.JSONError(c, http.StatusInternalServerError,
 			"Error generando el asset video", err.Error())
@@ -147,6 +153,6 @@ func (h *Handler) GenerateOneVideo(c *fiber.Ctx) error {
 
 	return c.JSON(helper.Response{
 		Data:    dto,
-		Message: "asset generado",
+		Message: "video generado",
 	})
 }

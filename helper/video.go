@@ -1,49 +1,141 @@
 package helper
 
 import (
-	"context"
+	"bytes"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
-
-	"google.golang.org/genai"
 )
 
-// GenerateVideo genera un vídeo a partir de un prompt usando Veo 2 y devuelve los bytes del MP4.
-// La duración es entre 5 a 8 segundos
-func GenerateVideo(prompt string, duration int32) ([]byte, error) {
-	ctx := context.TODO()
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:      os.Getenv("GEMINI_API_KEY"),
-		Backend:     genai.BackendGeminiAPI,
-		HTTPOptions: genai.HTTPOptions{APIVersion: "v1"},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
+// GenerateVideo crea un MP4 que muestra cada imagen durante un tiempo
+// calculado según la duración total y el número de imágenes.
+// Si duration < len(images), mostrará sólo las primeras duration imágenes
+// a 1 s cada una. Además aplica crossfade de 1 s entre cada par.
+// Luego superpone el audio (audioURL) y recorta al menor de vídeo o audio.
+func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, error) {
+	nImgs := len(images)
+	if nImgs == 0 {
+		return nil, fmt.Errorf("necesitas al menos una imagen")
 	}
 
-	videoConfig := &genai.GenerateVideosConfig{
-		AspectRatio:      "16:9",
-		PersonGeneration: "allow_adult",
-		DurationSeconds:  &duration,
-	}
-	op, err := client.Models.GenerateVideos(ctx, "models/veo-2.0-generate-001", prompt, nil, videoConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start video generation: %w", err)
+	// 1. Determinar cuántas imágenes usar y el tiempo por imagen
+	useImgs := nImgs
+	perImg := float64(duration) / float64(nImgs)
+	if int(duration) < nImgs {
+		useImgs = int(duration)
+		perImg = 1.0
 	}
 
-	// Poll until done
-	for !op.Done {
-		time.Sleep(5 * time.Second)
-		op, err = client.Operations.GetVideosOperation(ctx, op, nil)
+	// 2. Crear carpeta temporal
+	tmpDir, err := os.MkdirTemp("", "video-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// 3. Descargar las primeras useImgs imágenes
+	imgPaths := make([]string, useImgs)
+	client := http.Client{Timeout: 30 * time.Second}
+	for i := range useImgs {
+		resp, err := client.Get(images[i].Url)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch operation status: %w", err)
+			return nil, fmt.Errorf("descargando imagen %d: %w", i, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("imagen %d: código HTTP %d", i, resp.StatusCode)
+		}
+
+		path := filepath.Join(tmpDir, fmt.Sprintf("img-%02d.jpg", i))
+		f, err := os.Create(path)
+		if err != nil {
+			return nil, err
+		}
+		io.Copy(f, resp.Body)
+		f.Close()
+		imgPaths[i] = path
+	}
+
+	// 4. Generar vídeo sin audio con crossfade
+	videoNoAudio := filepath.Join(tmpDir, "video_no_audio.mp4")
+	args := []string{"-y"}
+
+	// Inputs: loop cada imagen el tiempo perImg+1 para cubrir el fade
+	for _, p := range imgPaths {
+		args = append(args,
+			"-loop", "1",
+			"-t", fmt.Sprintf("%.2f", perImg+1),
+			"-i", p,
+		)
+	}
+
+	// Construir filter_complex dinámico de xfade
+	// crossFadeDur = 1 segundo
+	crossFadeDur := 1.0
+	var fc bytes.Buffer
+	// Para el primer par: [0][1]xfade...
+	for i := range useImgs - 1 {
+		offset := perImg*float64(i+1) - crossFadeDur
+		if i == 0 {
+			fmt.Fprintf(&fc, "[0:v][1:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v0];", crossFadeDur, offset)
+		} else {
+			fmt.Fprintf(&fc, "[v%d][%d:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v%d];",
+				i-1, i+1, crossFadeDur, offset, i)
 		}
 	}
+	// El mapa final será [vN] donde N = useImgs-2
+	finalLabel := fmt.Sprintf("[v%d]", useImgs-2)
+	args = append(args,
+		"-filter_complex", fc.String(),
+		"-map", finalLabel,
+		"-pix_fmt", "yuv420p",
+		"-c:v", "libx264",
+		videoNoAudio,
+	)
 
-	if len(op.Response.GeneratedVideos) == 0 {
-		return nil, fmt.Errorf("no videos generated")
+	if out, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("ffmpeg vídeo sin audio: %s / %w", out, err)
 	}
 
-	return op.Response.GeneratedVideos[0].Video.VideoBytes, nil
+	// 5. Descargar audio
+	audioPath := filepath.Join(tmpDir, "audio.mp3")
+	resp, err := client.Get(audioURL)
+	if err != nil {
+		return nil, fmt.Errorf("descargando audio: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("audio: código HTTP %d", resp.StatusCode)
+	}
+	af, err := os.Create(audioPath)
+	if err != nil {
+		return nil, err
+	}
+	io.Copy(af, resp.Body)
+	af.Close()
+
+	// 6. Superponer audio y recortar al menor
+	finalVid := filepath.Join(tmpDir, "final.mp4")
+	mixCmd := exec.Command("ffmpeg",
+		"-y",
+		"-i", videoNoAudio,
+		"-i", audioPath,
+		"-c:v", "copy",
+		"-c:a", "aac",
+		"-b:a", "192k",
+		"-map", "0:v",
+		"-map", "1:a",
+		"-t", fmt.Sprintf("%.2f", duration),
+		finalVid,
+	)
+	if out, err := mixCmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("ffmpeg mezcla audio: %s / %w", out, err)
+	}
+
+	// 7. Leer y devolver bytes
+	return os.ReadFile(finalVid)
 }

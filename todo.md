@@ -9,14 +9,11 @@
 - [x] Que todo el flujo de generacion use los tokens de la suscripcion.
 - [x] Usar un modelo para la generación de los scripts.
 - [x] Cuando un Script se regenera, borrar logicamente los assets vinculados a el, junto con el borrado de las url de la tabla assets.
-- [] Implementar generacion de video.
-- [] Implementar el flujo de la generacion de video similar a el flujo de la generacion de audio.
 - [x] Implementar monetizacion y meter pasarela de pago.
-- [] Subir a aws.
 - [x] Dejar que el usuario cree de forma manual un asset sin cobrar porque no se usa la ia.
+- [] Implementar generacion de video.
 - [] Poner el precio en susbcription, tambien en los dtos, resetear la db.
-
-## ! Verificar si es factible.
-
-- [] Crear salas e invitar a otras personas.
-- [] Chat global en el proyecto.
+- [] La creación manual del script debe tener websocket.
+- [] Ver si hacer la edicion del script con sus assets, para editar un asset, su line, su tipo y cambiarlos de posición.
+- [] Poner las claves de stripe para el front.
+- [] Subir a aws.

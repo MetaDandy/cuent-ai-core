@@ -7,16 +7,20 @@ import (
 	generatejob "github.com/MetaDandy/cuent-ai-core/src/modules/generate_job"
 )
 
+type GenerateVideo struct {
+	KeyWords string `json:"key_words"`
+}
+
 type AssetResponse struct {
-	ID         string `json:"id"`
-	Type       string `json:"type"`
-	Video_URL  string `json:"video_url"`
-	Audio_URL  string `json:"audio_url"`
-	Line       string `json:"line"`
-	AudioState string `json:"audio_state"`
-	VideoState string `json:"video_state"`
-	Duration   uint   `json:"duration"`
-	Position   int    `json:"position"`
+	ID         string  `json:"id"`
+	Type       string  `json:"type"`
+	Video_URL  string  `json:"video_url"`
+	Audio_URL  string  `json:"audio_url"`
+	Line       string  `json:"line"`
+	AudioState string  `json:"audio_state"`
+	VideoState string  `json:"video_state"`
+	Duration   float64 `json:"duration"`
+	Position   int     `json:"position"`
 
 	Generated []generatejob.GeneratedJobResponse `json:"meta_data,omitempty"`
 

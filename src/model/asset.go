@@ -15,10 +15,10 @@ type Asset struct {
 	Video_URL  string
 	Audio_URL  string
 	Line       string
-	AudioState State `gorm:"type:state;default:'PENDING'"`
-	VideoState State `gorm:"type:state;default:'PENDING'"`
-	Duration   uint  `gorm:"not null"`
-	Position   int   `gorm:"not null"`
+	AudioState State   `gorm:"type:state;default:'PENDING'"`
+	VideoState State   `gorm:"type:state;default:'PENDING'"`
+	Duration   float64 `gorm:"not null"`
+	Position   int     `gorm:"not null"`
 
 	ScriptID uuid.UUID
 	Script   Script

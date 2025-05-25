@@ -5,7 +5,7 @@
     WORKDIR /src
     
     # Dependencias del sistema necesarias para compilación
-    RUN apk add --no-cache git gcc musl-dev
+    RUN apk add --no-cache git gcc musl-dev 
     
     # Dependencias de Go
     COPY go.mod go.sum ./
@@ -22,7 +22,7 @@
     FROM alpine:3.20
     
     # Instalar certificados de CA
-    RUN apk add --no-cache ca-certificates
+    RUN apk add --no-cache ca-certificates ffmpeg
     
     # Directorio de trabajo para la app
     WORKDIR /app

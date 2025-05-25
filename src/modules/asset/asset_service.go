@@ -168,7 +168,7 @@ func (s *Service) generate(id, userID string) (*model.Asset, error) {
 
 		asset.Audio_URL = url
 		asset.AudioState = model.StateFinished
-		asset.Duration = uint(duration.Seconds())
+		asset.Duration = duration.Seconds()
 		if err := tx.Save(asset).Error; err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func (s *Service) generate(id, userID string) (*model.Asset, error) {
 	return asset, nil
 }
 
-func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
+func (s *Service) GenerateVideo(id, userID string, key_words GenerateVideo) (*model.Asset, error) {
 	asset, err := s.repo.FindById(id)
 	if err != nil {
 		return nil, err
@@ -229,16 +229,7 @@ func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
 		return nil, err
 	}
 
-	var duration int32
-	if asset.Duration < 5 {
-		duration = 5
-	} else if asset.Duration > 8 {
-		duration = 8
-	} else {
-		duration = int32(asset.Duration)
-	}
-
-	tokens := uint(duration) * 50
+	tokens := uint(asset.Duration) * 50
 
 	if sub.TokensRemaining < tokens {
 		return nil, fmt.Errorf(
@@ -257,16 +248,18 @@ func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
 			return err
 		}
 
-		rawVideo, err := helper.GenerateVideo(asset.Line, duration)
+		images, err := helper.SearchImage(key_words.KeyWords)
+		if err != nil {
+			return err
+		}
+
+		rawVideo, err := helper.GenerateVideo(images, asset.Audio_URL, asset.Duration)
 		if err != nil {
 			return err
 		}
 
 		video := bytes.NewReader(rawVideo)
-
 		fileName := asset.ID.String() + ".mp4"
-
-		// ! Ver si unir la pista de audio y la pista de video.
 
 		url, err := helper.Upload(context.TODO(), bucket, dirPath, fileName, video, "video/mp4", false)
 		if err != nil {
@@ -299,9 +292,8 @@ func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
 		return nil
 	}); err != nil {
 		// ! Ver si es factible cobrar la mitad si ocurre un error
-		asset.AudioState = model.StateError
-		asset.Audio_URL = ""
-		asset.Duration = 0
+		asset.VideoState = model.StateError
+		asset.Video_URL = ""
 		badJob := model.GeneratedJob{
 			ID:            uuid.New(),
 			Error_Message: err.Error(),
@@ -310,7 +302,7 @@ func (s *Service) GenerateVideo(id, userID string) (*model.Asset, error) {
 		}
 
 		if e := s.repo.Update(asset); e != nil {
-			err = errors.Join(err, e) // Go 1.20+
+			err = errors.Join(err, e)
 		}
 		if e := s.genRepo.Create(&badJob); e != nil {
 			err = errors.Join(err, e)
