@@ -8,33 +8,9 @@ services:
       - .env
     environment:
       - PORT=${PORT}
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_PASS=${DB_PASS}
-      - DB_NAME=${DB_NAME}
+      - DATABASE_URL=${DATABASE_URL}
       - GOFLAGS=-buildvcs=false
     volumes:
       - .:/app
       - /go/pkg/mod
       - /app/tmp
-    depends_on:
-      - db
-
-  db:
-    image: postgres:15
-    container_name: cuent_ai_db
-    restart: always
-    ports:
-      - "${DB_PORT}:5432"
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:

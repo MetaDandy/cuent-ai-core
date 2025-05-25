@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -30,13 +29,17 @@ func Load() {
 
 	maxRetries := 10
 	for i := 0; i < maxRetries; i++ {
-		dns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-			os.Getenv("DB_HOST"),
-			os.Getenv("DB_USER"),
-			os.Getenv("DB_PASS"),
-			os.Getenv("DB_NAME"),
-			os.Getenv("DB_PORT"),
-		)
+		// dns := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+		// 	os.Getenv("DB_HOST"),
+		// 	os.Getenv("DB_USER"),
+		// 	os.Getenv("DB_PASS"),
+		// 	os.Getenv("DB_NAME"),
+		// 	os.Getenv("DB_PORT"),
+		// )
+		dns := os.Getenv("DATABASE_URL")
+		if dns == "" {
+			log.Fatal("DATABASE_URL not set in .env file")
+		}
 
 		DB, err = gorm.Open(postgres.Open(dns), &gorm.Config{})
 		if err == nil {
