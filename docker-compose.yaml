@@ -6,7 +6,3 @@ services:
       - "${PORT}:${PORT}"
     env_file:
       - .env
-    environment:
-      - PORT=${PORT}
-      - DATABASE_URL=${DATABASE_URL}
-      - GOFLAGS=-buildvcs=false
