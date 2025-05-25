@@ -16,7 +16,7 @@
     
     # Reconocer arquitectura dinámica de BuildKit y compilar para ella
     ARG TARGETARCH
-    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o app ./cmd/api
+    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -o app ./cmd
     
     # ---------- runtime stage ----------
     FROM alpine:3.20
