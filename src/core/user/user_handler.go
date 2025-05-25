@@ -1,13 +1,14 @@
 package user
 
 import (
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/middleware"
 	"github.com/gofiber/fiber/v2"
-	"github.com/stripe/stripe-go/webhook"
+	"github.com/stripe/stripe-go/v82/webhook"
 )
 
 type Handler struct {
@@ -162,23 +163,28 @@ func (h *Handler) AddSubscription(c *fiber.Ctx) error {
 func (h *Handler) StripeWebhook(c *fiber.Ctx) error {
 	payload := c.Body()
 	sigHeader := c.Get("Stripe-Signature")
+	secret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 
-	// 2. Validar y construir evento
-	endpointSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	event, err := webhook.ConstructEvent(payload, sigHeader, endpointSecret)
+	log.Println(secret)
+
+	evt, err := webhook.ConstructEvent(payload, sigHeader, secret)
 	if err != nil {
-		return c.Status(400).SendString("Webhook signature verification failed")
+		return c.Status(fiber.StatusBadRequest).SendString("signature error")
 	}
 
-	resp, err := h.svc.StripeWebhook(event)
-	if err != nil {
-		return helper.JSONError(c, http.StatusInternalServerError,
-			"Error en el evento del webhook", err.Error())
+	// Procesa sólo lo que te interesa
+	if resp, err := h.svc.StripeWebhook(evt); err != nil {
+		log.Printf("[stripe] %v", err) // ⬅️ Log interno
+		return c.Status(fiber.StatusInternalServerError).SendString("internal error")
+	} else if resp != nil {
+		return c.Status(fiber.StatusOK).JSON(helper.Response{
+			Data:    resp,
+			Message: "Suscripción activada",
+		})
 	}
-	return c.Status(http.StatusCreated).JSON(helper.Response{
-		Data:    resp,
-		Message: "Suscripción activada",
-	})
+
+	// Evento ignorado o sin DTO que devolver
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func (h *Handler) PaymentSubscription(c *fiber.Ctx) error {

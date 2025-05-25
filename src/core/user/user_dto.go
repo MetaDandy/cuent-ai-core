@@ -35,6 +35,14 @@ type PaymentResponse struct {
 	PaymentID string `json:"payment_id"`
 }
 
+type PaymentDetail struct {
+	ID        string    `json:"id"`
+	Amount    int       `json:"amount"`
+	Currency  string    `json:"currency"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type UserResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
@@ -87,6 +95,7 @@ type UserSubscriptionResponse struct {
 	End_Date         string `json:"end_date"`
 
 	Subscription subscription.SubscriptionResponse
+	Payments     []PaymentDetail `json:"payments,omitempty"`
 
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -100,12 +109,18 @@ func UserSubscriptionToDto(u *model.UserSubscribed) UserSubscriptionResponse {
 		deletedAt = &t
 	}
 
+	payments := make([]PaymentDetail, len(u.Payments))
+	if len(payments) > 0 {
+		payments = PaymentsToListDTO(u.Payments)
+	}
+
 	return UserSubscriptionResponse{
 		ID:               u.ID.String(),
 		Total_Cuentokens: u.TokensRemaining,
 		Start_Date:       u.StartDate.Local().String(),
 		End_Date:         u.EndDate.Local().String(),
 		Subscription:     subscription.SubscriptionToDTO(&u.Subscription),
+		Payments:         payments,
 		CreatedAt:        u.CreatedAt,
 		UpdatedAt:        u.UpdatedAt,
 		DeletedAt:        deletedAt,
@@ -116,6 +131,25 @@ func UserSubscriptionToListDTO(list []model.UserSubscribed) []UserSubscriptionRe
 	out := make([]UserSubscriptionResponse, len(list))
 	for i := range list {
 		out[i] = UserSubscriptionToDto(&list[i])
+	}
+	return out
+}
+
+// PaymentToDTO convierte un model.Payment en PaymentDetail
+func PaymentToDTO(p *model.Payment) PaymentDetail {
+	return PaymentDetail{
+		ID:        p.ID.String(),
+		Amount:    p.Amount,
+		Currency:  p.Currency,
+		Status:    string(p.Status),
+		CreatedAt: p.CreatedAt,
+	}
+}
+
+func PaymentsToListDTO(list []model.Payment) []PaymentDetail {
+	out := make([]PaymentDetail, len(list))
+	for i := range list {
+		out[i] = PaymentToDTO(&list[i])
 	}
 	return out
 }

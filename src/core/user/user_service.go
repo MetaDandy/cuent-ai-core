@@ -11,7 +11,9 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/google/uuid"
-	"github.com/stripe/stripe-go"
+	stripe "github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/invoice"
+	"github.com/stripe/stripe-go/v82/paymentintent"
 	"gorm.io/gorm"
 )
 
@@ -177,9 +179,19 @@ func (s *Service) AddSubscription(userID, subsID string) (*UserSubscriptionRespo
 		return nil, err
 	}
 
+	subUserActual, err := s.repo.GetActiveSubscription(user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
 	sub, err := s.repo.FindSubscriptionById(subsID)
 	if err != nil {
 		return nil, err
+	}
+
+	// ! Con este enfoque la suscripción no se renovaría manualmente, ver el tema de la suscripción mensual.
+	if sub.Name == "Free" && sub.ID == subUserActual.SubscriptionID {
+		return nil, errors.New("usted ya tenía una suscripción gratuita, debe comprar una de paga")
 	}
 
 	subUser := &model.UserSubscribed{
@@ -191,7 +203,11 @@ func (s *Service) AddSubscription(userID, subsID string) (*UserSubscriptionRespo
 		EndDate:         time.Now().AddDate(0, 1, 0),
 	}
 
-	if err := s.repo.CreatePendingSubscription(subUser); err != nil {
+	if sub.Name == "Free" {
+		subUser.Status = model.StateActive
+	}
+
+	if err := s.repo.CreateUserSubscription(subUser); err != nil {
 		return nil, err
 	}
 
@@ -202,6 +218,10 @@ func (s *Service) AddSubscription(userID, subsID string) (*UserSubscriptionRespo
 
 // Crea el pago y lo vincula a la suscripción creada previamente
 func (s *Service) PaySubscription(userID string, pay Payment) (*PaymentResponse, error) {
+	if pay.PriceID == "" {
+		return nil, errors.New("priceID vacío")
+	}
+
 	user, err := s.repo.FindById(userID)
 	if err != nil {
 		return nil, err
@@ -227,7 +247,7 @@ func (s *Service) PaySubscription(userID string, pay Payment) (*PaymentResponse,
 	}
 
 	payment_id := uuid.New()
-	sess, err := stripeClient.CreateSubscriptionSession(
+	sess, err := stripeClient.CreateOneTimeSession(
 		ctx,
 		user.StripeCustomerID,
 		pay.PriceID, // ! Ver que es el price ID
@@ -269,10 +289,19 @@ func (s *Service) StripeWebhook(event stripe.Event) (*UserSubscriptionResponse, 
 		if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
 			return nil, err
 		}
-		pi, err := helper.GetPaymentIntent(sess.PaymentIntent.ID)
-		if err != nil {
-			return nil, err
-		}
+
+		// ctx := context.Background()
+		// // 1️⃣ Recuperar la suscripción creada por Checkout
+		// subObj, err := stripeClient.GetSubscription(ctx, sess.Subscription.ID)
+		// if err != nil {
+		// 	return nil, err
+		// }
+
+		// // 2️⃣ De la suscripción, obtener la última factura
+		// inv, err := invoice.Get(subObj.LatestInvoice.ID, nil)
+		// if err != nil {
+		// 	return nil, err
+		// }
 
 		subsUserID := sess.Metadata["subs_user_id"]
 		paymentID := sess.Metadata["payment_id"]
@@ -285,10 +314,15 @@ func (s *Service) StripeWebhook(event stripe.Event) (*UserSubscriptionResponse, 
 			return nil, err
 		}
 
+		pi, err := paymentintent.Get(sess.PaymentIntent.ID, nil)
+		if err != nil {
+			return nil, err
+		}
+
 		payment.Status = model.StateActive
-		payment.Amount = int(pi.Amount)
+		payment.Amount = int(pi.AmountReceived)
 		payment.Currency = string(pi.Currency)
-		payment.StripePaymentIntentID = sess.PaymentIntent.ID
+		payment.StripePaymentIntentID = pi.ID
 		if err := s.repo.UpdatePayment(payment); err != nil {
 			return nil, err
 		}
@@ -301,19 +335,45 @@ func (s *Service) StripeWebhook(event stripe.Event) (*UserSubscriptionResponse, 
 		}
 		s.repo.ClosePreviousSubscriptions(sub.ID.String())
 
+		// _, err = subscription.Update(
+		// 	subObj.ID, // ID de Stripe
+		// 	&stripe.SubscriptionParams{
+		// 		CancelAtPeriodEnd: stripe.Bool(true),
+		// 	},
+		// )
+		// if err != nil {
+		// 	// No interrumpimos el flujo, pero registra el error
+		// 	log.Printf("[stripe] no se pudo marcar cancel_at_period_end: %v", err)
+		// }
+
 		dto := UserSubscriptionToDto(sub)
 		return &dto, nil
 
 	case "invoice.payment_failed":
-		var inv stripe.Invoice
+		// 1️⃣ Parseamos el invoice con el SDK
+		var inv *stripe.Invoice
 		if err := json.Unmarshal(event.Data.Raw, &inv); err != nil {
 			return nil, err
 		}
 
-		subObj, err := stripeClient.GetSubscription(context.Background(), inv.Subscription.ID)
+		// 2️⃣ Extraemos el ID de la suscripción desde el JSON crudo
+		var aux struct {
+			Subscription string `json:"subscription"`
+		}
+		_ = json.Unmarshal(event.Data.Raw, &aux) // ignoramos error; ya parseó arriba
+
+		// 3️⃣ Leemos la Subscription para acceder a los metadatos
+		subObj, err := stripeClient.GetSubscription(context.Background(), aux.Subscription)
 		if err != nil {
 			return nil, err
 		}
+
+		// 2️⃣ De esa su	scripción obtener la invoice
+		inv, err = invoice.Get(subObj.LatestInvoice.ID, nil)
+		if err != nil {
+			return nil, err
+		}
+
 		paymentID := subObj.Metadata["payment_id"]
 		payment, err := s.repo.FindPaymentID(paymentID)
 		if err != nil {
@@ -328,8 +388,10 @@ func (s *Service) StripeWebhook(event stripe.Event) (*UserSubscriptionResponse, 
 		}
 
 		return nil, errors.New("pago fallido")
+
+	default: // No procesamos otras respuestas
+		return nil, nil
 	}
-	return nil, errors.New("métodos no soportados")
 }
 
 func (s *Service) GetActiveSubscription(id string) (*UserSubscriptionResponse, error) {

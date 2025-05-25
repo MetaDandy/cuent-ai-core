@@ -13,7 +13,7 @@
 - [] Implementar el flujo de la generacion de video similar a el flujo de la generacion de audio.
 - [] Implementar monetizacion y meter pasarela de pago.
 - [] Subir a aws.
-- [] Dejar que el usuario cree de forma manual un asset sin cobrar porque no se usa la ia.
+- [x] Dejar que el usuario cree de forma manual un asset sin cobrar porque no se usa la ia.
 
 ## ! Verificar si es factible.
 

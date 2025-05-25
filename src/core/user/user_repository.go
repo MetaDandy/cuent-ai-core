@@ -62,7 +62,7 @@ func (r *Repository) Update(u *model.User) error {
 	return r.db.Save(u).Error
 }
 
-func (r *Repository) CreatePendingSubscription(sub *model.UserSubscribed) error {
+func (r *Repository) CreateUserSubscription(sub *model.UserSubscribed) error {
 	return r.db.Create(sub).Error
 }
 
@@ -81,7 +81,7 @@ func (r *Repository) UpdateUserSuscribed(u *model.UserSubscribed) error {
 func (r *Repository) FindPaymentID(id string) (*model.Payment, error) {
 	var pay *model.Payment
 	err := r.db.
-		Preload("Subscription").
+		Preload("UserSuscribed").
 		Where("id = ?", id).
 		First(&pay).Error
 	return pay, err
@@ -126,6 +126,7 @@ func (r *Repository) GetActiveSubscription(userID string) (*model.UserSubscribed
 	var us model.UserSubscribed
 	err := r.db.
 		Preload("Subscription").
+		Preload("Payments").
 		Where("user_id = ? AND end_date >= ?", userID, time.Now()).
 		First(&us).Error
 	return &us, err

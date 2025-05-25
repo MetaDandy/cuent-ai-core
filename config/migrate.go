@@ -28,6 +28,7 @@ func Migrate(db *gorm.DB) {
 	err := db.AutoMigrate(
 		&model.Asset{},
 		&model.GeneratedJob{},
+		&model.Payment{},
 		&model.Project{},
 		&model.Script{},
 		&model.Subscription{},

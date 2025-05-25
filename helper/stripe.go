@@ -16,6 +16,7 @@ type StripeClient struct {
 
 func NewStripeClient() *StripeClient {
 	key := os.Getenv("STRIPE_SECRET_KEY")
+	stripe.Key = key
 	return &StripeClient{client: stripe.NewClient(key)}
 }
 
@@ -26,6 +27,7 @@ func (s *StripeClient) CreateSubscriptionSession(
 	successURL,
 	cancelURL string,
 	metadata map[string]string,
+	persist bool,
 ) (*stripe.CheckoutSession, error) {
 	params := &stripe.CheckoutSessionParams{
 		Customer:           stripe.String(customerID),
@@ -37,7 +39,42 @@ func (s *StripeClient) CreateSubscriptionSession(
 		}},
 		SuccessURL: stripe.String(successURL),
 		CancelURL:  stripe.String(cancelURL),
-		Metadata:   metadata,
+	}
+
+	if persist {
+		params.SubscriptionData = &stripe.CheckoutSessionSubscriptionDataParams{
+			Metadata: metadata,
+		}
+	} else {
+		params.Metadata = metadata
+	}
+
+	return session.New(params)
+}
+
+// helper/stripe.go
+func (s *StripeClient) CreateOneTimeSession(
+	ctx context.Context,
+	customerID, priceID,
+	successURL, cancelURL string,
+	metadata map[string]string,
+) (*stripe.CheckoutSession, error) {
+
+	params := &stripe.CheckoutSessionParams{
+		Customer:           stripe.String(customerID),
+		PaymentMethodTypes: stripe.StringSlice([]string{"card"}),
+		Mode:               stripe.String(string(stripe.CheckoutSessionModePayment)), // 🔑
+		LineItems: []*stripe.CheckoutSessionLineItemParams{{
+			Price:    stripe.String(priceID), // debe ser price_xxx de tipo one_time
+			Quantity: stripe.Int64(1),
+		}},
+		SuccessURL: stripe.String(successURL),
+		CancelURL:  stripe.String(cancelURL),
+
+		Metadata: metadata, // viaja en la sesión
+		PaymentIntentData: &stripe.CheckoutSessionPaymentIntentDataParams{
+			Metadata: metadata, // viaja también en el PaymentIntent
+		},
 	}
 	return session.New(params)
 }
