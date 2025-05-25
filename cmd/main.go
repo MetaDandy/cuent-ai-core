@@ -26,5 +26,5 @@ func main() {
 	c := src.SetupContainer()
 	api.SetupApi(app, c)
 
-	app.Listen(":" + config.Port)
+	app.Listen("0.0.0.0:" + config.Port)
 }
