@@ -13,7 +13,7 @@
 - [x] Dejar que el usuario cree de forma manual un asset sin cobrar porque no se usa la ia.
 - [x] Implementar generacion de video.
 - [x] Poner el precio en susbcription, tambien en los dtos, resetear la db.
-- [] La creación manual del script debe tener websocket.
+- [x] La creación manual del script debe tener websocket.
 - [] Ver si hacer la edicion del script con sus assets, para editar un asset, su line, su tipo y cambiarlos de posición, combinado con websockets.
 - [] Poner las claves de stripe para el front.
 - [] Subir a aws.
