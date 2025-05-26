@@ -33,24 +33,28 @@ func SeedSubscriptions(db *gorm.DB) error {
 			Name:       "Free",
 			Cuentokens: 1000,
 			Duration:   makeDuration(30),
+			Price:      0,
 		},
 		{
 			ID:         uuid.New(),
-			Name:       "Standard", // plan base
+			Name:       "Standard",
 			Cuentokens: 5000,
 			Duration:   makeDuration(30),
+			Price:      5,
 		},
 		{
 			ID:         uuid.New(),
 			Name:       "Pro",
 			Cuentokens: 25000,
 			Duration:   makeDuration(30),
+			Price:      15,
 		},
 		{
 			ID:         uuid.New(),
 			Name:       "Enterprise",
 			Cuentokens: 100000,
 			Duration:   makeDuration(30),
+			Price:      30,
 		},
 	}
 	if err := db.Create(&plans).Error; err != nil {

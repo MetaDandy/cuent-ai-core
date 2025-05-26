@@ -12,6 +12,7 @@ type Subscription struct {
 	Name       string    `gorm:"not null"`
 	Cuentokens uint
 	Duration   time.Time
+	Price      float64
 
 	// Poner un precio luego de la monetización
 

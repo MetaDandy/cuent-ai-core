@@ -224,6 +224,10 @@ func (s *Service) GenerateVideo(id, userID string, key_words GenerateVideo) (*mo
 		return nil, err
 	}
 
+	if asset.AudioState == model.StateError || asset.AudioState == model.StatePending {
+		return nil, errors.New("para generar un video, primero debe haber generado el audio")
+	}
+
 	sub, err := s.userRepo.GetActiveSubscription(userID)
 	if err != nil {
 		return nil, err
@@ -291,7 +295,6 @@ func (s *Service) GenerateVideo(id, userID string, key_words GenerateVideo) (*mo
 
 		return nil
 	}); err != nil {
-		// ! Ver si es factible cobrar la mitad si ocurre un error
 		asset.VideoState = model.StateError
 		asset.Video_URL = ""
 		badJob := model.GeneratedJob{

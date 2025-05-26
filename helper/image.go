@@ -2,10 +2,12 @@ package helper
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 // Image contiene los datos que quieres extraer de cada resultado.
@@ -33,6 +35,11 @@ func SearchImage(prompt string) ([]Image, error) {
 		return nil, fmt.Errorf("debes definir la variable de entorno UNSPLASH_ACCESS_KEY")
 	}
 
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return nil, errors.New("el parámetro prompt no puede estar vacío")
+	}
+
 	endpoint := "https://api.unsplash.com/search/photos"
 	params := url.Values{}
 	params.Set("client_id", apiKey)
@@ -40,10 +47,15 @@ func SearchImage(prompt string) ([]Image, error) {
 	params.Set("page", "1")
 	params.Set("per_page", "10")
 
-	req, err := http.NewRequest("GET", endpoint+"?"+params.Encode(), nil)
+	reqURL := endpoint + "?" + params.Encode()
+
+	req, err := http.NewRequest("GET", reqURL, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Set("Accept-Version", "v1")
+	req.Header.Set("Authorization", "Client-ID "+apiKey)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

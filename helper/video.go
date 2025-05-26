@@ -16,18 +16,11 @@ import (
 // Si duration < len(images), mostrará sólo las primeras duration imágenes
 // a 1 s cada una. Además aplica crossfade de 1 s entre cada par.
 // Luego superpone el audio (audioURL) y recorta al menor de vídeo o audio.
+
 func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, error) {
 	nImgs := len(images)
 	if nImgs == 0 {
-		return nil, fmt.Errorf("necesitas al menos una imagen")
-	}
-
-	// 1. Determinar cuántas imágenes usar y el tiempo por imagen
-	useImgs := nImgs
-	perImg := float64(duration) / float64(nImgs)
-	if int(duration) < nImgs {
-		useImgs = int(duration)
-		perImg = 1.0
+		return nil, fmt.Errorf("necesitas al menos una imagen, prueba con otras keywords")
 	}
 
 	// 2. Crear carpeta temporal
@@ -37,29 +30,76 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// 3. Descargar las primeras useImgs imágenes
-	imgPaths := make([]string, useImgs)
+	// 5. Descargar audio
 	client := http.Client{Timeout: 30 * time.Second}
-	for i := range useImgs {
-		resp, err := client.Get(images[i].Url)
-		if err != nil {
-			return nil, fmt.Errorf("descargando imagen %d: %w", i, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("imagen %d: código HTTP %d", i, resp.StatusCode)
-		}
-
-		path := filepath.Join(tmpDir, fmt.Sprintf("img-%02d.jpg", i))
-		f, err := os.Create(path)
-		if err != nil {
-			return nil, err
-		}
-		io.Copy(f, resp.Body)
-		f.Close()
-		imgPaths[i] = path
+	audioPath := filepath.Join(tmpDir, "audio.mp3")
+	if err := downloadFile(client, audioURL, audioPath); err != nil {
+		return nil, err
 	}
 
+	// 1. Determinar cuántas imágenes usar y tiempo por imagen (2 s fijo)
+	perImg := 2.0
+	maxImgs := int(duration / perImg)
+	useImgs := max(min(maxImgs, nImgs), 1)
+
+	if useImgs < 2 {
+		imgPath := filepath.Join(tmpDir, "img.jpg")
+		if err := downloadFile(client, images[0].Url, imgPath); err != nil {
+			return nil, err
+		}
+		out := filepath.Join(tmpDir, "final.mp4")
+		// loop 1 imagen, t = duration, luego mezclar audio sin recortar
+		cmd := exec.Command("ffmpeg", "-y",
+			"-loop", "1", "-i", imgPath,
+			"-i", audioPath,
+			"-c:v", "libx264", "-t", fmt.Sprintf("%.2f", duration),
+			"-c:a", "aac", "-b:a", "192k",
+			"-map", "0:v", "-map", "1:a",
+			out,
+		)
+		if outp, err := cmd.CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("ffmpeg estático: %s / %w", outp, err)
+		}
+		return os.ReadFile(out)
+	}
+
+	// 3. Descargar las primeras useImgs imágenes
+	imgPaths := make([]string, useImgs)
+	for i := 0; i < useImgs; i++ {
+		imgPaths[i] = filepath.Join(tmpDir, fmt.Sprintf("img-%02d.jpg", i))
+		if err := downloadFile(client, images[i].Url, imgPaths[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	// Construir filter_complex: primero escalado+pad, luego xfade en cadena
+	// Definimos el tamaño de salida deseado:
+	width, height := 1080, 608
+	// Construir filter_complex dinámico de xfade
+	// crossFadeDur = 1 segundo
+	crossFadeDur := 1.0
+	var fc bytes.Buffer
+	// Escalado de cada stream de entrada
+	// ! NO usar range en los for
+	for i := 0; i < useImgs; i++ {
+		// [i:v]scale=1080:608:force_original_aspect_ratio=decrease,pad=1080:608:(ow-iw)/2:(oh-ih)/2[si{i}];
+		fmt.Fprintf(&fc, "[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2[si%d];",
+			i, width, height, width, height, i)
+	}
+
+	// Para el primer par: [0][1]xfade...
+	for i := 0; i < useImgs-1; i++ {
+		offset := perImg*float64(i+1) - crossFadeDur
+		if i == 0 {
+			fmt.Fprintf(&fc, "[si0][si1]xfade=transition=fade:duration=%.2f:offset=%.2f[v0];",
+				crossFadeDur, offset)
+		} else {
+			fmt.Fprintf(&fc, "[v%d][si%d]xfade=transition=fade:duration=%.2f:offset=%.2f[v%d];",
+				i-1, i+1, crossFadeDur, offset, i)
+		}
+	}
+
+	lastLabel := fmt.Sprintf("[v%d]", useImgs-2)
 	// 4. Generar vídeo sin audio con crossfade
 	videoNoAudio := filepath.Join(tmpDir, "video_no_audio.mp4")
 	args := []string{"-y"}
@@ -73,25 +113,9 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 		)
 	}
 
-	// Construir filter_complex dinámico de xfade
-	// crossFadeDur = 1 segundo
-	crossFadeDur := 1.0
-	var fc bytes.Buffer
-	// Para el primer par: [0][1]xfade...
-	for i := range useImgs - 1 {
-		offset := perImg*float64(i+1) - crossFadeDur
-		if i == 0 {
-			fmt.Fprintf(&fc, "[0:v][1:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v0];", crossFadeDur, offset)
-		} else {
-			fmt.Fprintf(&fc, "[v%d][%d:v]xfade=transition=fade:duration=%.2f:offset=%.2f[v%d];",
-				i-1, i+1, crossFadeDur, offset, i)
-		}
-	}
-	// El mapa final será [vN] donde N = useImgs-2
-	finalLabel := fmt.Sprintf("[v%d]", useImgs-2)
 	args = append(args,
 		"-filter_complex", fc.String(),
-		"-map", finalLabel,
+		"-map", lastLabel,
 		"-pix_fmt", "yuv420p",
 		"-c:v", "libx264",
 		videoNoAudio,
@@ -100,23 +124,6 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 	if out, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("ffmpeg vídeo sin audio: %s / %w", out, err)
 	}
-
-	// 5. Descargar audio
-	audioPath := filepath.Join(tmpDir, "audio.mp3")
-	resp, err := client.Get(audioURL)
-	if err != nil {
-		return nil, fmt.Errorf("descargando audio: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("audio: código HTTP %d", resp.StatusCode)
-	}
-	af, err := os.Create(audioPath)
-	if err != nil {
-		return nil, err
-	}
-	io.Copy(af, resp.Body)
-	af.Close()
 
 	// 6. Superponer audio y recortar al menor
 	finalVid := filepath.Join(tmpDir, "final.mp4")
@@ -138,4 +145,21 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 
 	// 7. Leer y devolver bytes
 	return os.ReadFile(finalVid)
+}
+func downloadFile(client http.Client, url, dest string) error {
+	resp, err := client.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("código HTTP %d", resp.StatusCode)
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
 }
