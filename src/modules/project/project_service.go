@@ -1,6 +1,8 @@
 package project
 
 import (
+	"errors"
+
 	"github.com/MetaDandy/cuent-ai-core/helper"
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
@@ -122,7 +124,7 @@ func (s *Service) Restore(id string) (*ProjectResponse, error) {
 		return nil, err
 	}
 	if project == nil {
-		return nil, nil
+		return nil, errors.New("entity not finded")
 	}
 
 	if err := s.repo.Restore(id); err != nil {
