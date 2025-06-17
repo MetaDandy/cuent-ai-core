@@ -34,7 +34,7 @@ func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int6
 
 func (r *Repository) FindById(id string) (*model.Project, error) {
 	var project model.Project
-	err := r.db.First(&project, "id = ?", id).Error
+	err := r.db.Preload("Scripts").First(&project, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
