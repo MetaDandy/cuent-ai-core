@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -17,8 +15,8 @@ import (
 )
 
 // ? Ver si enviar el context como parametro
-func AudioOutput(line, id, bucket, dirPath string) (
-	url, historyID, audioType string,
+func AudioOutput(line, id, bucket, dirPath, audioType string) (
+	url, historyID string,
 	duration time.Duration,
 	err error,
 ) {
@@ -28,7 +26,7 @@ func AudioOutput(line, id, bucket, dirPath string) (
 	)
 	duration = 3 * time.Second
 
-	if strings.HasPrefix(line, "*") {
+	if audioType == "SFX" {
 		prompt := strings.TrimSpace(strings.TrimPrefix(line, "*"))
 		audio, historyID, err = TextToSoundEffects(
 			prompt,
@@ -36,25 +34,23 @@ func AudioOutput(line, id, bucket, dirPath string) (
 			1.0,
 			"mp3_44100_128",
 		)
-		audioType = "SFX"
 
 		fileName = fmt.Sprintf("sfx_%v.mp3", id)
 	} else {
 		// Esto es TTS normal
 		audio, historyID, err = TextToSpeechElevenlabs(line, "")
 		if err != nil {
-			return "", historyID, "", 0, err
+			return "", historyID, 0, err
 		}
 		fileName = fmt.Sprintf("tts_%v.mp3", id)
 		duration, err = Mp3Duration(audio)
-		audioType = "TTS"
 		if err != nil {
-			return "", historyID, "", 0, err
+			return "", historyID, 0, err
 		}
 	}
 
 	if err != nil {
-		return "", historyID, "", 0, err
+		return "", historyID, 0, err
 	}
 
 	if url, err = Upload(
@@ -66,41 +62,10 @@ func AudioOutput(line, id, bucket, dirPath string) (
 		"audio/mpeg",
 		true,
 	); err != nil {
-		return "", historyID, "", 0, err
+		return "", historyID, 0, err
 	}
 
-	return url, historyID, audioType, duration, nil
-}
-
-func AudioOutputWithRetry(text, assetID, bucket, dirPath string) (url string, historyID string, duration time.Duration, err error) {
-	const maxRetries = 5
-	baseDelay := time.Second // tiempo base para el backoff
-
-	for attempt := range maxRetries {
-		url, historyID, _, duration, err = AudioOutput(text, assetID, bucket, dirPath)
-		if err == nil {
-			return url, historyID, duration, nil
-		}
-
-		var httpErr *HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 429 {
-			retryAfter := httpErr.Header.Get("Retry-After")
-			wait := baseDelay * (1 << attempt)
-
-			if retryAfter != "" {
-				if seconds, parseErr := strconv.Atoi(retryAfter); parseErr == nil {
-					wait = time.Duration(seconds) * time.Second
-				}
-			}
-
-			time.Sleep(wait)
-			continue
-		}
-
-		return "", "", 0, err
-	}
-
-	return "", "", 0, errors.New("excedidos reintentos por rate limit")
+	return url, historyID, duration, nil
 }
 
 func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
@@ -111,7 +76,7 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 
 	client := resty.New()
 	if voice_id == "" {
-		voice_id = "29vD33N1CtxCmqQRPOHJ"
+		voice_id = "VR6AewLTigWG4xSOukaG" // 29vD33N1CtxCmqQRPOHJ
 	}
 
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", voice_id)
@@ -123,7 +88,7 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 		SetHeader("Accept", "audio/mpeg").
 		SetBody(map[string]interface{}{
 			"text":     text,
-			"model_id": "eleven_monolingual_v1",
+			"model_id": "eleven_multilingual_v2",
 			"voice_settings": map[string]interface{}{
 				"stability":        0.5,
 				"similarity_boost": 0.75,

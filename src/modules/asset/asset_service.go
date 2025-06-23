@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/MetaDandy/cuent-ai-core/helper"
@@ -133,7 +132,7 @@ func (s *Service) generate(id, userID string) (*model.Asset, error) {
 	}
 
 	var tokens uint
-	if strings.HasPrefix(asset.Line, "*") {
+	if asset.Type == "SFX" {
 		tokens = 40
 	} else {
 		tokens = uint(utf8.RuneCountInString(asset.Line))
@@ -156,7 +155,7 @@ func (s *Service) generate(id, userID string) (*model.Asset, error) {
 			return err
 		}
 
-		url, historyID, _, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath)
+		url, historyID, duration, err := helper.AudioOutput(asset.Line, asset.ID.String(), bucket, dirPath, string(asset.Type))
 		if err != nil {
 			return err
 		}
