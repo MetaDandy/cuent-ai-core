@@ -119,6 +119,8 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("xi-api-key", apiKey).
+		SetHeader("User-Agent", "Cuent-ai/1.0 (Go; +https://github.com/MetaDandy/cuent-ai-core)").
+		SetHeader("Accept", "audio/mpeg").
 		SetBody(map[string]interface{}{
 			"text":     text,
 			"model_id": "eleven_monolingual_v1",
@@ -179,6 +181,8 @@ func TextToSoundEffects(
 	resp, err := client.R().
 		SetHeader("Content-Type", "application/json").
 		SetHeader("xi-api-key", apiKey).
+		SetHeader("User-Agent", "Cuent-ai/1.0 (Go; +https://github.com/MetaDandy/cuent-ai-core)").
+		SetHeader("Accept", "audio/mpeg").
 		SetBody(body).
 		SetDoNotParseResponse(true).
 		Post(url)
