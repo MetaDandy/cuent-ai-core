@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -246,13 +248,28 @@ func (s *Service) PaySubscription(userID string, pay Payment) (*PaymentResponse,
 		}
 	}
 
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+
+	successURL := fmt.Sprintf("%s/payment/success?session_id={CHECKOUT_SESSION_ID}", frontendURL)
+	cancelURL := fmt.Sprintf("%s/payment/cancel", frontendURL)
+
+	if customSuccessURL := os.Getenv("STRIPE_SUCCESS_URL"); customSuccessURL != "" {
+		successURL = customSuccessURL
+	}
+	if customCancelURL := os.Getenv("STRIPE_CANCEL_URL"); customCancelURL != "" {
+		cancelURL = customCancelURL
+	}
+
 	payment_id := uuid.New()
 	sess, err := stripeClient.CreateOneTimeSession(
 		ctx,
 		user.StripeCustomerID,
-		pay.PriceID, // ! Ver que es el price ID
-		"https://tu-dominio.com/success",
-		"https://tu-dominio.com/cancel",
+		pay.PriceID,
+		successURL,
+		cancelURL,
 		map[string]string{
 			"subs_user_id": sub.ID.String(),
 			"payment_id":   payment_id.String(),
