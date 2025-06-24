@@ -48,10 +48,10 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 			return nil, err
 		}
 		out := filepath.Join(tmpDir, "final.mp4")
-		// loop 1 imagen, t = duration, luego mezclar audio sin recortar
 		cmd := exec.Command("ffmpeg", "-y",
 			"-loop", "1", "-i", imgPath,
 			"-i", audioPath,
+			"-vf", "scale=1080:608:force_original_aspect_ratio=decrease,pad=1080:608:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
 			"-c:v", "libx264", "-t", fmt.Sprintf("%.2f", duration),
 			"-c:a", "aac", "-b:a", "192k",
 			"-map", "0:v", "-map", "1:a",
@@ -65,29 +65,28 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 
 	// 3. Descargar las primeras useImgs imágenes
 	imgPaths := make([]string, useImgs)
-	for i := 0; i < useImgs; i++ {
+	for i := range useImgs {
 		imgPaths[i] = filepath.Join(tmpDir, fmt.Sprintf("img-%02d.jpg", i))
 		if err := downloadFile(client, images[i].Url, imgPaths[i]); err != nil {
 			return nil, err
 		}
 	}
 
+	// CORREGIDO: Definir dimensiones que sean siempre pares
+	width, height := 1080, 608 // Ambos son pares
+
 	// Construir filter_complex: primero escalado+pad, luego xfade en cadena
-	// Definimos el tamaño de salida deseado:
-	width, height := 1080, 608
-	// Construir filter_complex dinámico de xfade
-	// crossFadeDur = 1 segundo
 	crossFadeDur := 1.0
 	var fc bytes.Buffer
-	// Escalado de cada stream de entrada
-	// ! NO usar range en los for
-	for i := 0; i < useImgs; i++ {
-		// [i:v]scale=1080:608:force_original_aspect_ratio=decrease,pad=1080:608:(ow-iw)/2:(oh-ih)/2[si{i}];
-		fmt.Fprintf(&fc, "[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2[si%d];",
+
+	// CORREGIDO: Escalado de cada stream con formato explícito
+	for i := range useImgs {
+		// Agregar format=yuv420p para asegurar compatibilidad con H.264
+		fmt.Fprintf(&fc, "[%d:v]scale=%d:%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,format=yuv420p[si%d];",
 			i, width, height, width, height, i)
 	}
 
-	// Para el primer par: [0][1]xfade...
+	// Para el primer par: [si0][si1]xfade...
 	for i := 0; i < useImgs-1; i++ {
 		offset := perImg*float64(i+1) - crossFadeDur
 		if i == 0 {
@@ -100,6 +99,7 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 	}
 
 	lastLabel := fmt.Sprintf("[v%d]", useImgs-2)
+
 	// 4. Generar vídeo sin audio con crossfade
 	videoNoAudio := filepath.Join(tmpDir, "video_no_audio.mp4")
 	args := []string{"-y"}
@@ -118,6 +118,7 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 		"-map", lastLabel,
 		"-pix_fmt", "yuv420p",
 		"-c:v", "libx264",
+		"-preset", "medium",
 		videoNoAudio,
 	)
 
@@ -146,6 +147,7 @@ func GenerateVideo(images []Image, audioURL string, duration float64) ([]byte, e
 	// 7. Leer y devolver bytes
 	return os.ReadFile(finalVid)
 }
+
 func downloadFile(client http.Client, url, dest string) error {
 	resp, err := client.Get(url)
 	if err != nil {

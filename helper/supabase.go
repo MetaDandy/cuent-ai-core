@@ -24,7 +24,7 @@ func Upload(
 	fileName string, // nombre del objeto (obligatorio)
 	body io.Reader,
 	mime string,
-	upsert bool,
+	upsert bool, // Crea si no existe, sobreescribe si existe
 ) (string, error) {
 
 	// 1. Normalizar la ruta: eliminar / inicial o final para evitar "//"

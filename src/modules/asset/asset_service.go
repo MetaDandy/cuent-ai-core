@@ -264,7 +264,7 @@ func (s *Service) GenerateVideo(id, userID string, key_words GenerateVideo) (*mo
 		video := bytes.NewReader(rawVideo)
 		fileName := asset.ID.String() + ".mp4"
 
-		url, err := helper.Upload(context.TODO(), bucket, dirPath, fileName, video, "video/mp4", false)
+		url, err := helper.Upload(context.TODO(), bucket, dirPath, fileName, video, "video/mp4", true)
 		if err != nil {
 			return err
 		}
