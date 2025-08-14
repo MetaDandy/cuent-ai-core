@@ -76,7 +76,7 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 
 	client := resty.New()
 	if voice_id == "" {
-		voice_id = "VR6AewLTigWG4xSOukaG" // 29vD33N1CtxCmqQRPOHJ
+		voice_id = "29vD33N1CtxCmqQRPOHJ" // VR6AewLTigWG4xSOukaG
 	}
 
 	url := fmt.Sprintf("https://api.elevenlabs.io/v1/text-to-speech/%s", voice_id)
@@ -88,7 +88,7 @@ func TextToSpeechElevenlabs(text, voice_id string) ([]byte, string, error) {
 		SetHeader("Accept", "audio/mpeg").
 		SetBody(map[string]interface{}{
 			"text":     text,
-			"model_id": "eleven_multilingual_v2",
+			"model_id": "eleven_monolingual_v1", // eleven_monolingual_v2
 			"voice_settings": map[string]interface{}{
 				"stability":        0.5,
 				"similarity_boost": 0.75,
