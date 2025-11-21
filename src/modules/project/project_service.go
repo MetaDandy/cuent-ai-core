@@ -7,15 +7,14 @@ import (
 	"github.com/MetaDandy/cuent-ai-core/src/core/user"
 	"github.com/MetaDandy/cuent-ai-core/src/model"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Service struct {
-	repo     *Repository
+	repo     Repository
 	userRepo *user.Repository
 }
 
-func NewService(r *Repository, u *user.Repository) *Service {
+func NewService(r Repository, u *user.Repository) *Service {
 	return &Service{repo: r, userRepo: u}
 }
 
@@ -62,13 +61,7 @@ func (s *Service) Create(input *ProjectCreate) (*ProjectResponse, error) {
 		UserID:      user.ID,
 	}
 
-	if err := s.repo.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&project).Error; err != nil {
-			return err
-		}
-		// ... aquí podrías crear scripts, logs, etc. y devolver err si algo falla
-		return nil
-	}); err != nil {
+	if err := s.repo.Create(&project); err != nil {
 		return nil, err
 	}
 

@@ -17,7 +17,7 @@ type Container struct {
 	UserHdl  *user.Handler
 
 	// Project
-	ProjectRepo *project.Repository
+	ProjectRepo project.Repository
 	ProjectSvc  *project.Service
 	ProjectHdl  *project.Handler
 

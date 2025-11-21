@@ -6,23 +6,33 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository struct {
+type Repository interface {
+	Create(project *model.Project) error
+	Update(project *model.Project) error
+	FindAll(opts *helper.FindAllOptions) ([]model.Project, int64, error)
+	FindById(id string) (*model.Project, error)
+	FindByIdUnscoped(id string) (*model.Project, error)
+	SoftDelete(id string) error
+	Restore(id string) error
+}
+
+type PostgresRepository struct {
 	db *gorm.DB
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *gorm.DB) *PostgresRepository {
+	return &PostgresRepository{db: db}
 }
 
-func (r *Repository) Create(project *model.Project) error {
+func (r *PostgresRepository) Create(project *model.Project) error {
 	return r.db.Create(project).Error
 }
 
-func (r *Repository) Update(project *model.Project) error {
+func (r *PostgresRepository) Update(project *model.Project) error {
 	return r.db.Save(project).Error
 }
 
-func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int64, error) {
+func (r *PostgresRepository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int64, error) {
 	var finded []model.Project
 	query := r.db.Model(model.Project{})
 	var total int64
@@ -32,7 +42,7 @@ func (r *Repository) FindAll(opts *helper.FindAllOptions) ([]model.Project, int6
 	return finded, total, err
 }
 
-func (r *Repository) FindById(id string) (*model.Project, error) {
+func (r *PostgresRepository) FindById(id string) (*model.Project, error) {
 	var project model.Project
 	err := r.db.Preload("Scripts").First(&project, "id = ?", id).Error
 	if err != nil {
@@ -41,7 +51,7 @@ func (r *Repository) FindById(id string) (*model.Project, error) {
 	return &project, nil
 }
 
-func (r *Repository) FindByIdUnscoped(id string) (*model.Project, error) {
+func (r *PostgresRepository) FindByIdUnscoped(id string) (*model.Project, error) {
 	var project model.Project
 	err := r.db.Unscoped().First(&project, "id = ?", id).Error
 	if err != nil {
@@ -50,11 +60,11 @@ func (r *Repository) FindByIdUnscoped(id string) (*model.Project, error) {
 	return &project, nil
 }
 
-func (r *Repository) SoftDelete(id string) error {
+func (r *PostgresRepository) SoftDelete(id string) error {
 	return r.db.Delete(&model.Project{}, "id = ?", id).Error
 }
 
-func (r *Repository) Restore(id string) error {
+func (r *PostgresRepository) Restore(id string) error {
 	return r.db.Unscoped().
 		Model(&model.Project{}).
 		Where("id = ?", id).

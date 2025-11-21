@@ -20,12 +20,12 @@ import (
 
 type Service struct {
 	repo        *Repository
-	projectRepo *project.Repository
+	projectRepo project.Repository
 	assetRepo   *asset.Repository
 	userRepo    *user.Repository
 }
 
-func NewService(r *Repository, pr *project.Repository, ar *asset.Repository, ur *user.Repository) *Service {
+func NewService(r *Repository, pr project.Repository, ar *asset.Repository, ur *user.Repository) *Service {
 	return &Service{repo: r, projectRepo: pr, assetRepo: ar, userRepo: ur}
 }
 
