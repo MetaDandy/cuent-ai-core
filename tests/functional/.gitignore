@@ -1,0 +1,4 @@
+# Ignore generated test reports
+reports/
+*.html
+test_output.json
