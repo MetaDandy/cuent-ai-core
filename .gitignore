@@ -1,1 +1,6 @@
 .env
+selenium.test
+
+# Selenium screenshots
+tests/selenium/screenshots/
+tests/selenium/tests/
